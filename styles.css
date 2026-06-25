@@ -1,0 +1,220 @@
+/* ============================================================
+   Selection Toolbar — floating formatting bar + AI panel.
+   Themed entirely via Obsidian CSS variables so it inherits
+   light / dark / community themes with no per-theme branches.
+   ============================================================ */
+
+/* ---------- Toolbar ---------- */
+.selection-toolbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: var(--layer-popover);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-s);
+  user-select: none;
+  -webkit-user-select: none;
+  animation: selection-toolbar-in 90ms ease-out;
+}
+
+@keyframes selection-toolbar-in {
+  from { opacity: 0; transform: translateY(2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.selection-toolbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-s);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color 100ms ease, color 100ms ease;
+}
+
+.selection-toolbar-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.selection-toolbar-btn:active {
+  background: var(--background-modifier-active-hover);
+}
+
+.selection-toolbar-btn:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -1px;
+}
+
+.selection-toolbar-btn.is-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.selection-toolbar-btn .svg-icon {
+  width: var(--icon-s);
+  height: var(--icon-s);
+}
+
+.selection-toolbar-btn.is-ai {
+  color: var(--interactive-accent);
+}
+
+.selection-toolbar-sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 3px;
+  background: var(--background-modifier-border);
+}
+
+/* ---------- AI panel ---------- */
+.selection-ai-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: var(--layer-popover);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 360px;
+  max-width: 90vw;
+  padding: 10px;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-l, var(--shadow-s));
+  user-select: none;
+  -webkit-user-select: none;
+  animation: selection-toolbar-in 90ms ease-out;
+}
+
+.selection-ai-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.selection-ai-action {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+  border: 1px solid transparent;
+  border-radius: var(--radius-s);
+  cursor: pointer;
+}
+
+.selection-ai-action:hover {
+  border-color: var(--background-modifier-border);
+  background: var(--background-modifier-active-hover);
+}
+
+.selection-ai-action .svg-icon {
+  width: var(--icon-xs, 14px);
+  height: var(--icon-xs, 14px);
+}
+
+.selection-ai-prompt-row {
+  display: flex;
+  gap: 6px;
+}
+
+.selection-ai-prompt {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+  background: var(--background-primary-alt, var(--background-secondary));
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  padding: 5px 8px;
+}
+
+.selection-ai-prompt:focus {
+  outline: none;
+  border-color: var(--interactive-accent);
+}
+
+.selection-ai-output {
+  font-size: var(--font-ui-small);
+  line-height: 1.45;
+  color: var(--text-normal);
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  padding: 8px;
+  max-height: 240px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.selection-ai-output.is-empty {
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+.selection-ai-status {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+.selection-ai-status.is-error {
+  color: var(--text-error);
+}
+
+.selection-ai-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.selection-ai-btn {
+  font-size: var(--font-ui-small);
+  padding: 4px 10px;
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--interactive-normal);
+  color: var(--text-normal);
+}
+
+.selection-ai-btn:hover {
+  background: var(--interactive-hover);
+}
+
+.selection-ai-btn.mod-cta {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: transparent;
+}
+
+.selection-ai-btn.mod-cta:hover {
+  background: var(--interactive-accent-hover);
+}
+
+.selection-ai-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .selection-toolbar,
+  .selection-ai-panel {
+    animation-duration: 0ms;
+  }
+  .selection-toolbar-btn {
+    transition-duration: 0ms;
+  }
+}
