@@ -12,6 +12,23 @@ export interface AIAction {
   inputPlaceholder?: string;
   /** Build the user message from selection + optional input. Default: selection. */
   buildUser?: (selection: string, input: string) => string;
+  /** Use the configured "quick" (fast) model — for high-frequency simple edits. */
+  quick?: boolean;
+  /** Explicit model override (used by custom actions). Wins over quick/default. */
+  model?: string;
+  /** Marks user-defined actions (vs built-in presets). */
+  custom?: boolean;
+}
+
+/** A user-defined action, persisted in settings. */
+export interface CustomAction {
+  id: string;
+  label: string;
+  system: string;
+  needsInput: boolean;
+  inputPlaceholder?: string;
+  /** "" / "default" → use the global default model. */
+  model: string;
 }
 
 /** Resolve the user message for an action. */

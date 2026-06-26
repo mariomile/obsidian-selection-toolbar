@@ -1,20 +1,35 @@
 import { Component, Notice, setIcon, type Editor, type EditorPosition } from "obsidian";
 import type { EditorView } from "@codemirror/view";
 import { computePosition, autoUpdate, offset, flip, shift } from "@floating-ui/dom";
-import { AI_ACTIONS } from "./actions";
 import { buildUserMessage, type AIAction } from "./types";
 import { streamCompletion, describeError, isAbort, type ResolvedCli } from "./client";
 import { selectionRect } from "../utils/editor";
 
 export interface AIConfig {
   cli: ResolvedCli;
+  /** Default model. */
   model: string;
+  /** Fast model for actions flagged `quick`. */
+  modelQuick: string;
   outputMode: "preview" | "direct";
+  /** Show a before/after diff in preview mode. */
+  showDiff: boolean;
 }
 
 export interface AIPanelDeps {
   getConfig: () => AIConfig;
+  /** Built-in + user-defined actions, re-read on every open. */
+  getActions: () => AIAction[];
 }
+
+export interface OpenOptions {
+  /** Pre-select an action by id (auto-runs it if it needs no input). */
+  actionId?: string;
+  /** Re-run the last action on the new selection. */
+  repeat?: boolean;
+}
+
+const DIFF_CHAR_CAP = 6000;
 
 /** Floating panel anchored to the selection: pick an action → stream Claude. */
 export class AIPanel extends Component {
@@ -40,6 +55,17 @@ export class AIPanel extends Component {
   private lastAction: AIAction | null = null;
   private lastInput = "";
 
+  // Working-state UI
+  private startedAt = 0;
+  private timerHandle: number | null = null;
+  private workingLabel: HTMLElement | null = null;
+  private firstDelta = false;
+  private textEl: HTMLElement | null = null;
+
+  // Diff
+  private canDiff = false;
+  private showingDiff = false;
+
   constructor(private deps: AIPanelDeps) {
     super();
     this.el = document.body.createDiv({ cls: "selection-ai-panel" });
@@ -49,21 +75,6 @@ export class AIPanel extends Component {
 
   private build(): void {
     this.actionsEl = this.el.createDiv({ cls: "selection-ai-actions" });
-    for (const action of AI_ACTIONS) {
-      const btn = this.actionsEl.createDiv({
-        cls: "selection-ai-action",
-        attr: { role: "button", tabindex: "0", "aria-label": action.label },
-      });
-      setIcon(btn.createSpan(), action.icon);
-      btn.createSpan({ text: action.label });
-      this.registerDomEvent(btn, "click", () => this.selectAction(action));
-      this.registerDomEvent(btn, "keydown", (e: KeyboardEvent) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          this.selectAction(action);
-        }
-      });
-    }
 
     const row = this.el.createDiv({ cls: "selection-ai-prompt-row" });
     this.promptInput = row.createEl("input", {
@@ -86,12 +97,33 @@ export class AIPanel extends Component {
     this.footerEl = this.el.createDiv({ cls: "selection-ai-footer" });
   }
 
-  open(view: EditorView, editor: Editor): void {
+  private renderActions(): void {
+    this.actionsEl.empty();
+    for (const action of this.deps.getActions()) {
+      const btn = this.actionsEl.createDiv({
+        cls: "selection-ai-action",
+        attr: { role: "button", tabindex: "0", "aria-label": action.label },
+      });
+      setIcon(btn.createSpan(), action.icon);
+      btn.createSpan({ text: action.label });
+      this.registerDomEvent(btn, "click", () => this.selectAction(action));
+      this.registerDomEvent(btn, "keydown", (e: KeyboardEvent) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          this.selectAction(action);
+        }
+      });
+    }
+  }
+
+  open(view: EditorView, editor: Editor, opts: OpenOptions = {}): void {
     this.reset();
     this.editor = editor;
     this.from = editor.getCursor("from");
     this.to = editor.getCursor("to");
     this.original = editor.getSelection();
+
+    this.renderActions();
 
     const ref = selectionRect(view);
     this.el.show();
@@ -110,6 +142,16 @@ export class AIPanel extends Component {
       });
     }
     this.promptInput.focus();
+
+    if (opts.repeat) {
+      if (this.lastAction) void this.generate(this.lastAction, this.lastInput);
+      else this.setStatus("No previous AI action yet — pick one.", true);
+      return;
+    }
+    if (opts.actionId) {
+      const action = this.deps.getActions().find((a) => a.id === opts.actionId);
+      if (action) this.selectAction(action);
+    }
   }
 
   private selectAction(action: AIAction): void {
@@ -137,8 +179,8 @@ export class AIPanel extends Component {
       return;
     }
     if (!input) return;
-    const custom = AI_ACTIONS.find((a) => a.id === "custom")!;
-    void this.generate(custom, input);
+    const custom = this.deps.getActions().find((a) => a.id === "custom");
+    if (custom) void this.generate(custom, input);
   }
 
   private async generate(action: AIAction, input: string): Promise<void> {
@@ -149,12 +191,13 @@ export class AIPanel extends Component {
     this.lastInput = input;
     this.generating = true;
     this.result = "";
+    this.showingDiff = false;
     this.controller = new AbortController();
 
     const direct = cfg.outputMode === "direct";
-    this.outputEl.removeClass("is-empty");
-    this.outputEl.setText("");
-    this.setStatus(direct ? "Writing into the editor…" : "Generating with Claude Code…");
+    const model = action.model || (action.quick ? cfg.modelQuick : cfg.model);
+
+    this.startWorking(direct);
     this.renderFooter([{ label: "Stop", onClick: () => this.cancel() }]);
 
     if (direct) {
@@ -166,40 +209,45 @@ export class AIPanel extends Component {
     try {
       await streamCompletion({
         cli: cfg.cli,
-        model: cfg.model,
+        model,
         system: action.system,
         user: buildUserMessage(action, this.original, input),
         signal: this.controller.signal,
         onDelta: (delta) => this.onDelta(delta, direct),
       });
     } catch (e) {
-      if (isAbort(e)) {
-        if (direct) this.restoreDirect();
-        this.generating = false;
-        return;
-      }
+      this.stopWorking();
+      this.generating = false;
       if (direct) this.restoreDirect();
-      this.setStatus(describeError(e), true);
-      new Notice(describeError(e));
+      if (isAbort(e)) {
+        this.setStatus("Stopped.");
+      } else {
+        this.setStatus(describeError(e), true);
+        new Notice(describeError(e));
+      }
       this.renderFooter([
         { label: "Retry", cta: true, onClick: () => this.retry() },
         { label: "Close", onClick: () => this.close() },
       ]);
-      this.generating = false;
       return;
     }
 
+    this.stopWorking();
     this.generating = false;
     if (direct) {
       this.close();
       return;
     }
-    this.setStatus("Done.");
-    this.renderFooter([
-      { label: "Replace", cta: true, onClick: () => this.accept() },
-      { label: "Retry", onClick: () => this.retry() },
-      { label: "Discard", onClick: () => this.close() },
-    ]);
+    const elapsed = ((Date.now() - this.startedAt) / 1000).toFixed(1);
+    this.setStatus(`Done in ${elapsed}s.`);
+    this.canDiff =
+      cfg.showDiff &&
+      this.original.trim().length > 0 &&
+      this.result.trim() !== this.original.trim() &&
+      this.original.length + this.result.length <= DIFF_CHAR_CAP;
+    this.showingDiff = this.canDiff;
+    this.renderOutput();
+    this.renderResultFooter();
   }
 
   private onDelta(delta: string, direct: boolean): void {
@@ -208,10 +256,84 @@ export class AIPanel extends Component {
       this.editor.replaceRange(delta, this.directEnd);
       const offsetEnd = this.editor.posToOffset(this.directEnd) + delta.length;
       this.directEnd = this.editor.offsetToPos(offsetEnd);
+      return;
+    }
+    if (!this.firstDelta) {
+      // First token arrived: drop the working spinner, start showing text.
+      this.firstDelta = true;
+      this.stopWorking();
+      this.outputEl.empty();
+      this.outputEl.removeClass("is-empty");
+      this.textEl = this.outputEl.createSpan({ cls: "selection-ai-text" });
+      this.outputEl.createSpan({ cls: "selection-ai-caret" });
+      this.setStatus("Streaming…");
+    }
+    this.textEl?.setText(this.result);
+    this.outputEl.scrollTop = this.outputEl.scrollHeight;
+  }
+
+  /** Animated "working" indicator covering the cold-start dead-air. */
+  private startWorking(direct: boolean): void {
+    this.firstDelta = false;
+    this.textEl = null;
+    this.startedAt = Date.now();
+    this.outputEl.empty();
+    this.outputEl.removeClass("is-empty");
+    const w = this.outputEl.createDiv({ cls: "selection-ai-working" });
+    w.createSpan({ cls: "selection-ai-spinner" });
+    this.workingLabel = w.createSpan({ cls: "selection-ai-working-label" });
+    this.setStatus(direct ? "Writing into the editor…" : "");
+    this.tick();
+    this.timerHandle = window.setInterval(() => this.tick(), 150);
+  }
+
+  private tick(): void {
+    if (!this.workingLabel) return;
+    const s = ((Date.now() - this.startedAt) / 1000).toFixed(1);
+    this.workingLabel.setText(`Claude is working… ${s}s`);
+  }
+
+  private stopWorking(): void {
+    if (this.timerHandle != null) {
+      window.clearInterval(this.timerHandle);
+      this.timerHandle = null;
+    }
+    this.workingLabel = null;
+  }
+
+  private renderOutput(): void {
+    this.outputEl.empty();
+    this.outputEl.removeClass("is-empty");
+    if (this.showingDiff) {
+      for (const seg of wordDiff(this.original, this.result)) {
+        const cls =
+          seg.type === "del"
+            ? "selection-ai-del"
+            : seg.type === "add"
+            ? "selection-ai-add"
+            : undefined;
+        this.outputEl.createSpan(cls ? { cls, text: seg.text } : { text: seg.text });
+      }
     } else {
       this.outputEl.setText(this.result);
-      this.outputEl.scrollTop = this.outputEl.scrollHeight;
     }
+  }
+
+  private renderResultFooter(): void {
+    const buttons: FooterButton[] = [{ label: "Replace", cta: true, onClick: () => this.accept() }];
+    if (this.canDiff) {
+      buttons.push({
+        label: this.showingDiff ? "Show result" : "Show diff",
+        onClick: () => {
+          this.showingDiff = !this.showingDiff;
+          this.renderOutput();
+          this.renderResultFooter();
+        },
+      });
+    }
+    buttons.push({ label: "Retry", onClick: () => this.retry() });
+    buttons.push({ label: "Discard", onClick: () => this.close() });
+    this.renderFooter(buttons);
   }
 
   /** Restore the original selection text after a failed/cancelled direct run. */
@@ -240,7 +362,7 @@ export class AIPanel extends Component {
     this.controller?.abort();
   }
 
-  private renderFooter(buttons: Array<{ label: string; cta?: boolean; onClick: () => void }>): void {
+  private renderFooter(buttons: FooterButton[]): void {
     this.footerEl.empty();
     for (const b of buttons) {
       const btn = this.footerEl.createEl("button", {
@@ -266,6 +388,7 @@ export class AIPanel extends Component {
   close(): void {
     this.controller?.abort();
     this.controller = null;
+    this.stopWorking();
     this.cleanupAutoUpdate?.();
     this.cleanupAutoUpdate = null;
     this.el.hide();
@@ -282,6 +405,10 @@ export class AIPanel extends Component {
     this.directEnd = null;
     this.generating = false;
     this.selectedAction = null;
+    this.firstDelta = false;
+    this.textEl = null;
+    this.canDiff = false;
+    this.showingDiff = false;
     this.promptInput.value = "";
     this.promptInput.placeholder = "Describe an edit, or pick an action above…";
     this.outputEl.addClass("is-empty");
@@ -292,7 +419,54 @@ export class AIPanel extends Component {
 
   onunload(): void {
     this.controller?.abort();
+    this.stopWorking();
     this.cleanupAutoUpdate?.();
     this.el.remove();
   }
+}
+
+interface FooterButton {
+  label: string;
+  cta?: boolean;
+  onClick: () => void;
+}
+
+type DiffSeg = { type: "eq" | "del" | "add"; text: string };
+
+/** Word-level diff (LCS over whitespace/word tokens). No dependencies. */
+function wordDiff(a: string, b: string): DiffSeg[] {
+  const A = a.match(/\s+|[^\s]+/g) ?? [];
+  const B = b.match(/\s+|[^\s]+/g) ?? [];
+  const n = A.length;
+  const m = B.length;
+  const dp: number[][] = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      dp[i][j] = A[i] === B[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    }
+  }
+  const segs: DiffSeg[] = [];
+  const push = (type: DiffSeg["type"], text: string) => {
+    const last = segs[segs.length - 1];
+    if (last && last.type === type) last.text += text;
+    else segs.push({ type, text });
+  };
+  let i = 0;
+  let j = 0;
+  while (i < n && j < m) {
+    if (A[i] === B[j]) {
+      push("eq", A[i]);
+      i++;
+      j++;
+    } else if (dp[i + 1][j] >= dp[i][j + 1]) {
+      push("del", A[i]);
+      i++;
+    } else {
+      push("add", B[j]);
+      j++;
+    }
+  }
+  while (i < n) push("del", A[i++]);
+  while (j < m) push("add", B[j++]);
+  return segs;
 }

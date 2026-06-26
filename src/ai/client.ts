@@ -43,6 +43,12 @@ export function streamCompletion(p: CliStreamParams): Promise<void> {
     // a "setting source", so the subscription login still resolves. (`--bare`
     // would also skip hooks but breaks auth by skipping keychain reads.)
     "--setting-sources", "project",
+    // SECURITY (defense in depth): this is a text transform — Claude must never
+    // execute anything. Deny every standard tool so even a prompt-injection in
+    // the selected text cannot run a command, read, or write files. Unknown
+    // names just log a harmless stderr warning (ignored on success).
+    "--disallowedTools",
+    "Bash,BashOutput,KillShell,Edit,MultiEdit,Write,NotebookEdit,Read,Glob,Grep,LS,WebFetch,WebSearch,Task,TodoWrite,SlashCommand",
     "--system-prompt", p.system,
   ];
   if (p.model && p.model !== "default") args.push("--model", p.model);
@@ -73,6 +79,8 @@ export function streamCompletion(p: CliStreamParams): Promise<void> {
 
     let buf = "";
     let resultError: string | null = null;
+    let resultText = "";
+    let streamed = false;
     let stderr = "";
 
     child.on("error", (err) => finish(() => reject(err))); // e.g. ENOENT
@@ -99,10 +107,12 @@ export function streamCompletion(p: CliStreamParams): Promise<void> {
         if (obj.type === "stream_event") {
           const ev = obj.event;
           if (ev?.type === "content_block_delta" && ev.delta?.type === "text_delta" && ev.delta.text) {
+            streamed = true;
             p.onDelta(ev.delta.text);
           }
-        } else if (obj.type === "result" && obj.is_error) {
-          resultError = obj.result || obj.subtype || "Claude CLI returned an error.";
+        } else if (obj.type === "result") {
+          if (obj.is_error) resultError = obj.result || obj.subtype || "Claude CLI returned an error.";
+          else if (typeof obj.result === "string") resultText = obj.result;
         }
       }
     });
@@ -120,6 +130,9 @@ export function streamCompletion(p: CliStreamParams): Promise<void> {
         } else if (code !== 0) {
           reject(new Error(stderr.trim() || `claude exited with code ${code ?? "null"}`));
         } else {
+          // Fallback: some short replies arrive only in the final `result`,
+          // not as streamed text_delta — emit it so the panel never shows blank.
+          if (!streamed && resultText) p.onDelta(resultText);
           resolve();
         }
       })
@@ -241,6 +254,29 @@ function makeAbortError(): Error {
 /** True when the error is our own abort (cancel / restart). */
 export function isAbort(e: unknown): boolean {
   return e instanceof Error && e.name === "AbortError";
+}
+
+/** Run a tiny call to verify the CLI is found, logged in, and responding. */
+export async function testConnection(cli: ResolvedCli, model: string): Promise<{ ok: boolean; message: string }> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 30000);
+  let out = "";
+  try {
+    await streamCompletion({
+      cli,
+      model: model || "default",
+      system: "You are a connectivity check. Reply with exactly: ok",
+      user: "ping",
+      signal: ctrl.signal,
+      onDelta: (d) => (out += d),
+    });
+    clearTimeout(timer);
+    return { ok: true, message: `Connected — ${cli.bin}` };
+  } catch (e) {
+    clearTimeout(timer);
+    if (isAbort(e)) return { ok: false, message: "Timed out after 30s." };
+    return { ok: false, message: describeError(e) };
+  }
 }
 
 /** Map a spawn/CLI error to a short, user-facing message. */

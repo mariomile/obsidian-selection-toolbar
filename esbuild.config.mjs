@@ -1,17 +1,20 @@
 import esbuild from "esbuild";
 import process from "process";
 import builtins from "builtin-modules";
-import { copyFileSync, mkdirSync } from "fs";
+import { copyFileSync, mkdirSync, readFileSync, existsSync } from "fs";
 import { resolve } from "path";
 
 const prod = process.argv[2] === "production";
 
-// Auto-deploy straight into the vault's plugin folder (same pattern as the
-// "Native" plugin). esbuild watch then rebuilds + redeploys on every save.
-const outdir = resolve(
-  process.env.HOME,
-  "Vaults/marioverse.ai/.obsidian/plugins/selection-toolbar"
-);
+// Output location. Default: the project root (publishable — no personal paths in
+// git). To auto-deploy into your vault during dev, either set the
+// OBSIDIAN_PLUGIN_DIR env var, or create a gitignored `.obsidian-plugin-dir`
+// file containing the absolute path to your plugin folder.
+const projectRoot = process.cwd();
+const localDirFile = resolve(projectRoot, ".obsidian-plugin-dir");
+const outdir =
+  process.env.OBSIDIAN_PLUGIN_DIR ||
+  (existsSync(localDirFile) ? readFileSync(localDirFile, "utf8").trim() : projectRoot);
 
 mkdirSync(outdir, { recursive: true });
 
@@ -46,10 +49,12 @@ const context = await esbuild.context({
   outfile: resolve(outdir, "main.js"),
 });
 
-// Copy static assets next to the bundle (runs once at startup; re-run
-// `npm run dev` after editing manifest.json / styles.css).
-copyFileSync("manifest.json", resolve(outdir, "manifest.json"));
-copyFileSync("styles.css", resolve(outdir, "styles.css"));
+// Copy static assets next to the bundle when deploying elsewhere (skip when
+// building in place — they're already here). Re-run after editing them.
+if (resolve(outdir) !== resolve(projectRoot)) {
+  copyFileSync("manifest.json", resolve(outdir, "manifest.json"));
+  copyFileSync("styles.css", resolve(outdir, "styles.css"));
+}
 
 if (prod) {
   await context.rebuild();

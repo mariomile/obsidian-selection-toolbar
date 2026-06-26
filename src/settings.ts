@@ -1,6 +1,7 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import { App, Notice, PluginSettingTab, Setting } from "obsidian";
 import type SelectionToolbarPlugin from "./main";
 import { COMMANDS, ALL_IDS } from "./commands/registry";
+import type { CustomAction } from "./ai/types";
 
 export type AIOutputMode = "preview" | "direct";
 
@@ -16,7 +17,13 @@ export interface SelectionToolbarSettings {
   claudeCliPath: string;
   /** Model alias, or "default" to use Claude Code's configured model. */
   aiModel: string;
+  /** Fast model for "quick" actions (fix grammar, shorten). */
+  aiModelQuick: string;
   aiOutputMode: AIOutputMode;
+  /** Show a before/after diff in preview mode. */
+  aiShowDiff: boolean;
+  /** User-defined actions, shown alongside the built-in presets. */
+  customActions: CustomAction[];
 }
 
 export const DEFAULT_SETTINGS: SelectionToolbarSettings = {
@@ -27,7 +34,10 @@ export const DEFAULT_SETTINGS: SelectionToolbarSettings = {
   aiEnabled: true,
   claudeCliPath: "",
   aiModel: "default",
+  aiModelQuick: "haiku",
   aiOutputMode: "preview",
+  aiShowDiff: true,
+  customActions: [],
 };
 
 const AI_MODELS: Record<string, string> = {
@@ -139,6 +149,17 @@ export class SelectionToolbarSettingTab extends PluginSettingTab {
         });
 
       new Setting(containerEl)
+        .setName("Quick model")
+        .setDesc("Faster model used for high-frequency simple edits (Fix grammar, Shorten).")
+        .addDropdown((d) => {
+          for (const [id, label] of Object.entries(AI_MODELS)) d.addOption(id, label);
+          d.setValue(this.plugin.settings.aiModelQuick).onChange(async (v) => {
+            this.plugin.settings.aiModelQuick = v;
+            await this.plugin.saveSettings();
+          });
+        });
+
+      new Setting(containerEl)
         .setName("Output mode")
         .setDesc("Preview lets you accept/discard before replacing. Direct streams straight into the editor (Cmd+Z to undo).")
         .addDropdown((d) =>
@@ -151,7 +172,131 @@ export class SelectionToolbarSettingTab extends PluginSettingTab {
               await this.plugin.saveSettings();
             })
         );
+
+      new Setting(containerEl)
+        .setName("Show diff in preview")
+        .setDesc("In preview mode, highlight what changed (red = removed, green = added) before you Replace.")
+        .addToggle((tg) =>
+          tg.setValue(this.plugin.settings.aiShowDiff).onChange(async (v) => {
+            this.plugin.settings.aiShowDiff = v;
+            await this.plugin.saveSettings();
+          })
+        );
+
+      const testSetting = new Setting(containerEl)
+        .setName("Test connection")
+        .setDesc("Run a tiny call to verify Claude is found, logged in, and responding.");
+      testSetting.addButton((b) =>
+        b.setButtonText("Test").onClick(async () => {
+          b.setButtonText("Testing…").setDisabled(true);
+          testSetting.setDesc("Running…");
+          const res = await this.plugin.runConnectionTest();
+          testSetting.setDesc(res.message);
+          b.setButtonText("Test").setDisabled(false);
+          new Notice(`Selection Toolbar — ${res.ok ? "✓ " : "✗ "}${res.message}`);
+        })
+      );
+
+      this.renderCustomActions(containerEl);
     }
+  }
+
+  private renderCustomActions(containerEl: HTMLElement): void {
+    new Setting(containerEl).setName("Custom actions").setHeading();
+    containerEl.createEl("p", {
+      text: "Your own reusable prompts. Each appears as a button in the AI panel. The selected text is sent as content; your prompt is the system instruction.",
+      cls: "setting-item-description",
+    });
+
+    this.plugin.settings.customActions.forEach((action, i) => {
+      const box = containerEl.createDiv({ cls: "selection-custom-action" });
+
+      new Setting(box)
+        .setName(`Action ${i + 1}`)
+        .addText((t) =>
+          t
+            .setPlaceholder("Button label — e.g. PRD bullet")
+            .setValue(action.label)
+            .onChange(async (v) => {
+              action.label = v;
+              await this.plugin.saveSettings();
+            })
+        )
+        .addExtraButton((b) =>
+          b
+            .setIcon("trash-2")
+            .setTooltip("Delete action")
+            .onClick(async () => {
+              this.plugin.settings.customActions.splice(i, 1);
+              await this.plugin.saveSettings();
+              this.display();
+            })
+        );
+
+      new Setting(box)
+        .setName("Prompt (system)")
+        .setDesc("What Claude should do with the selected text.")
+        .addTextArea((t) => {
+          t.setPlaceholder("Rewrite the text as a concise PRD bullet starting with a verb.")
+            .setValue(action.system)
+            .onChange(async (v) => {
+              action.system = v;
+              await this.plugin.saveSettings();
+            });
+          t.inputEl.rows = 3;
+          t.inputEl.addClass("selection-custom-prompt");
+        });
+
+      new Setting(box)
+        .setName("Model")
+        .addDropdown((d) => {
+          for (const [id, label] of Object.entries(AI_MODELS)) d.addOption(id, label);
+          d.setValue(action.model || "default").onChange(async (v) => {
+            action.model = v;
+            await this.plugin.saveSettings();
+          });
+        });
+
+      new Setting(box)
+        .setName("Ask for an extra input")
+        .setDesc("If on, the panel asks for a value (e.g. a target language) before running.")
+        .addToggle((tg) =>
+          tg.setValue(action.needsInput).onChange(async (v) => {
+            action.needsInput = v;
+            await this.plugin.saveSettings();
+            this.display();
+          })
+        );
+
+      if (action.needsInput) {
+        new Setting(box).setName("Input placeholder").addText((t) =>
+          t
+            .setPlaceholder("e.g. Target language")
+            .setValue(action.inputPlaceholder ?? "")
+            .onChange(async (v) => {
+              action.inputPlaceholder = v;
+              await this.plugin.saveSettings();
+            })
+        );
+      }
+    });
+
+    new Setting(containerEl).addButton((b) =>
+      b
+        .setButtonText("Add custom action")
+        .setCta()
+        .onClick(async () => {
+          this.plugin.settings.customActions.push({
+            id: `custom-${Date.now().toString(36)}`,
+            label: "",
+            system: "",
+            needsInput: false,
+            model: "default",
+          });
+          await this.plugin.saveSettings();
+          this.display();
+        })
+    );
   }
 
   private isEnabled(id: string): boolean {
