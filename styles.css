@@ -174,14 +174,21 @@
   word-break: break-word;
 }
 
+/* Idle (no run yet): collapse the placeholder box so the panel stays compact —
+   the tall min-height only applies once there's content. */
 .selection-ai-output.is-empty {
-  color: var(--text-faint);
-  font-style: italic;
+  display: none;
 }
 
 .selection-ai-status {
   font-size: var(--font-ui-smaller);
   color: var(--text-muted);
+}
+
+/* Collapse the status / footer when they have nothing to show. */
+.selection-ai-status:empty,
+.selection-ai-footer:empty {
+  display: none;
 }
 
 .selection-ai-status.is-error {
