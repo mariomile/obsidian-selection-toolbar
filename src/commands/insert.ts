@@ -11,10 +11,18 @@ export function applyLink(editor: Editor): void {
   editor.setSelection(urlStart, urlEnd);
 }
 
-/** [[selection]] internal link. */
+/**
+ * [[selection]] internal link. The cursor is left inside, right after `[[` +
+ * selection (before the closing `]]`), so Obsidian's note suggester opens with
+ * the selection as the query — pick any note to link to. Dismiss it and the
+ * `[[selection]]` link is already valid.
+ */
 export function applyInternalLink(editor: Editor): void {
   const sel = editor.getSelection();
+  const from = editor.getCursor("from");
   editor.replaceSelection(`[[${sel}]]`);
+  const inner = editor.offsetToPos(editor.posToOffset(from) + 2 + sel.length);
+  editor.setSelection(inner, inner);
 }
 
 /** Strip common inline + line markdown markers from the selection. */

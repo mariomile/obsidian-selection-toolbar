@@ -62,7 +62,7 @@ export const COMMANDS: ToolbarCommand[] = [
 
   // insert
   { id: "link", label: "Link", icon: "link", group: "insert", apply: applyLink },
-  { id: "internal-link", label: "Internal link", icon: "file-symlink", group: "insert", apply: applyInternalLink },
+  { id: "internal-link", label: "Wikilink [[ ]]", icon: "file-symlink", group: "insert", apply: applyInternalLink },
   { id: "clear", label: "Clear formatting", icon: "remove-formatting", group: "insert", apply: applyClearFormatting },
 ];
 
