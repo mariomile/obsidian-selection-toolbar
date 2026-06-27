@@ -68,6 +68,15 @@ export class AIPanel extends Component {
     this.el = document.body.createDiv({ cls: "selection-ai-panel" });
     this.el.hide();
     this.build();
+
+    // Click anywhere outside the panel closes it (and aborts any run).
+    // The toolbar's ✨ button stopPropagation's its mousedown, so the click
+    // that opens the panel never reaches here.
+    this.registerDomEvent(document, "mousedown", (e) => {
+      if (!this.visible) return;
+      if (this.el.contains(e.target as Node)) return;
+      this.close();
+    });
   }
 
   private build(): void {
