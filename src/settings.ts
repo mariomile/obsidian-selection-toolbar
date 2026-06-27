@@ -10,6 +10,8 @@ export interface SelectionToolbarSettings {
   enabledCommandIds: string[];
   showDelayMs: number;
   minSelectionLength: number;
+  /** Max command buttons in the bar before extras move to a ⋯ menu (0 = all). */
+  toolbarMaxButtons: number;
 
   // AI — via the local Claude Code CLI (subscription).
   aiEnabled: boolean;
@@ -30,6 +32,7 @@ export const DEFAULT_SETTINGS: SelectionToolbarSettings = {
   enabledCommandIds: [],
   showDelayMs: 120,
   minSelectionLength: 1,
+  toolbarMaxButtons: 14,
 
   aiEnabled: true,
   claudeCliPath: "",
@@ -83,6 +86,20 @@ export class SelectionToolbarSettingTab extends PluginSettingTab {
               this.plugin.settings.minSelectionLength = n;
               await this.plugin.saveSettings();
             }
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Max buttons in the bar")
+      .setDesc("Beyond this, extra buttons move into a ⋯ overflow menu. 0 = show all in one row.")
+      .addSlider((s) =>
+        s
+          .setLimits(0, 24, 1)
+          .setValue(this.plugin.settings.toolbarMaxButtons)
+          .setDynamicTooltip()
+          .onChange(async (v) => {
+            this.plugin.settings.toolbarMaxButtons = v;
+            await this.plugin.saveSettings();
           })
       );
 

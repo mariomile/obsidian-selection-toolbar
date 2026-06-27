@@ -17,6 +17,8 @@ export interface ToolbarDeps {
   resolveEditor: (view: EditorView) => Editor | null;
   /** When set, an AI (✨) button is rendered that calls this on click. */
   onAI?: (view: EditorView, editor: Editor) => void;
+  /** Max command buttons in the bar before the rest go to a ⋯ menu (0 = all). */
+  maxButtons: number;
 }
 
 /**
@@ -31,39 +33,93 @@ export class SelectionToolbar extends Component {
   private cleanupAutoUpdate: (() => void) | null = null;
   private visible = false;
 
+  // Overflow ("More") menu
+  private overflowEl: HTMLElement | null = null;
+  private moreBtn: HTMLElement | null = null;
+  private overflowVisible = false;
+
   constructor(private deps: ToolbarDeps) {
     super();
     this.el = document.body.createDiv({ cls: "selection-toolbar" });
     this.el.setAttribute("role", "toolbar");
     this.el.hide();
     this.buildButtons();
+
+    // Dismiss the overflow menu on an outside click. (Toolbar buttons
+    // stopPropagation on mousedown, so clicking ⋯ itself won't self-close.)
+    this.registerDomEvent(document, "mousedown", (e) => {
+      if (!this.overflowVisible) return;
+      const t = e.target as Node;
+      if (this.overflowEl?.contains(t) || this.moreBtn?.contains(t)) return;
+      this.hideOverflow();
+    });
   }
 
   private buildButtons(): void {
     this.el.empty();
     this.buttons.clear();
-    let prevGroup: string | null = null;
+    this.destroyOverflow();
 
-    for (const cmd of this.deps.commands) {
-      if (prevGroup && cmd.group !== prevGroup) this.addSeparator();
+    const cmds = this.deps.commands;
+    const max = this.deps.maxButtons;
+    let visible = cmds;
+    let overflow: ToolbarCommand[] = [];
+    if (max > 0 && cmds.length > max) {
+      visible = cmds.slice(0, max - 1);
+      overflow = cmds.slice(max - 1);
+    }
+
+    let prevGroup: string | null = null;
+    for (const cmd of visible) {
+      if (prevGroup && cmd.group !== prevGroup) this.addSeparator(this.el);
       prevGroup = cmd.group;
-      const btn = this.makeButton(cmd.icon, cmd.label, () => this.runCommand(cmd));
+      const btn = this.makeButton(this.el, cmd.icon, cmd.label, () => this.runCommand(cmd));
       this.buttons.set(cmd.id, btn);
     }
 
+    if (overflow.length) {
+      this.addSeparator(this.el);
+      this.moreBtn = this.makeButton(this.el, "ellipsis", "More", () => this.toggleOverflow());
+      this.buildOverflow(overflow);
+    }
+
     if (this.deps.onAI) {
-      this.addSeparator();
-      const ai = this.makeButton("wand-2", "AI actions", () => this.runAI());
+      this.addSeparator(this.el);
+      const ai = this.makeButton(this.el, "wand-2", "AI actions", () => this.runAI());
       ai.addClass("is-ai");
     }
   }
 
-  private addSeparator(): void {
-    this.el.createDiv({ cls: "selection-toolbar-sep" });
+  private buildOverflow(cmds: ToolbarCommand[]): void {
+    this.overflowEl = document.body.createDiv({
+      cls: "selection-toolbar selection-toolbar-overflow",
+    });
+    this.overflowEl.setAttribute("role", "toolbar");
+    this.overflowEl.hide();
+
+    let prevGroup: string | null = null;
+    for (const cmd of cmds) {
+      if (prevGroup && cmd.group !== prevGroup) this.addSeparator(this.overflowEl);
+      prevGroup = cmd.group;
+      const btn = this.makeButton(this.overflowEl, cmd.icon, cmd.label, () => {
+        this.runCommand(cmd);
+        this.hideOverflow();
+      });
+      this.buttons.set(cmd.id, btn);
+    }
   }
 
-  private makeButton(icon: string, label: string, onClick: () => void): HTMLElement {
-    const btn = this.el.createDiv({
+  private addSeparator(parent: HTMLElement): void {
+    parent.createDiv({ cls: "selection-toolbar-sep" });
+  }
+
+  private makeButton(
+    parent: HTMLElement,
+    icon: string,
+    label: string,
+    onClick: () => void
+  ): HTMLElement {
+    const btn = parent.createDiv({
       cls: "selection-toolbar-btn",
       attr: { "aria-label": label, role: "button", tabindex: "0" },
     });
@@ -85,6 +141,37 @@ export class SelectionToolbar extends Component {
       }
     });
     return btn;
+  }
+
+  private toggleOverflow(): void {
+    if (this.overflowVisible) this.hideOverflow();
+    else this.showOverflow();
+  }
+
+  private showOverflow(): void {
+    if (!this.overflowEl || !this.moreBtn) return;
+    this.overflowEl.show();
+    this.overflowVisible = true;
+    computePosition(this.moreBtn, this.overflowEl, {
+      placement: "bottom",
+      middleware: [offset(6), flip(), shift({ padding: 8 })],
+    }).then(({ x, y }) => {
+      if (!this.overflowEl) return;
+      this.overflowEl.style.left = `${x}px`;
+      this.overflowEl.style.top = `${y}px`;
+    });
+  }
+
+  private hideOverflow(): void {
+    this.overflowEl?.hide();
+    this.overflowVisible = false;
+  }
+
+  private destroyOverflow(): void {
+    this.overflowEl?.remove();
+    this.overflowEl = null;
+    this.moreBtn = null;
+    this.overflowVisible = false;
   }
 
   private runCommand(cmd: ToolbarCommand): void {
@@ -113,6 +200,7 @@ export class SelectionToolbar extends Component {
       this.hide();
       return;
     }
+    this.hideOverflow();
     this.el.show();
     this.visible = true;
     this.refreshActiveStates();
@@ -145,6 +233,7 @@ export class SelectionToolbar extends Component {
   hide(): void {
     if (!this.visible) return;
     this.visible = false;
+    this.hideOverflow();
     this.el.hide();
     this.cleanupAutoUpdate?.();
     this.cleanupAutoUpdate = null;
@@ -157,6 +246,7 @@ export class SelectionToolbar extends Component {
 
   onunload(): void {
     this.cleanupAutoUpdate?.();
+    this.destroyOverflow();
     this.el.remove();
   }
 }

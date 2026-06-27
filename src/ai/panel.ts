@@ -331,9 +331,19 @@ export class AIPanel extends Component {
         },
       });
     }
+    buttons.push({ label: "Insert below", onClick: () => this.insertBelow() });
     buttons.push({ label: "Retry", onClick: () => this.retry() });
     buttons.push({ label: "Discard", onClick: () => this.close() });
     this.renderFooter(buttons);
+  }
+
+  /** Non-destructive: keep the selection, add the result on a new line after it. */
+  private insertBelow(): void {
+    if (this.editor && this.to && this.result) {
+      const eol = { line: this.to.line, ch: this.editor.getLine(this.to.line).length };
+      this.editor.replaceRange(`\n\n${this.result}`, eol, eol);
+    }
+    this.close();
   }
 
   /** Restore the original selection text after a failed/cancelled direct run. */

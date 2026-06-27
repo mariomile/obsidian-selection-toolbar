@@ -75,6 +75,12 @@
   background: var(--background-modifier-border);
 }
 
+/* Overflow ("More") menu — wraps so it never runs off-screen. */
+.selection-toolbar-overflow {
+  flex-wrap: wrap;
+  max-width: 360px;
+}
+
 /* ---------- AI panel ---------- */
 .selection-ai-panel {
   position: fixed;

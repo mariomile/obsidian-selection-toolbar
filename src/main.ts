@@ -154,6 +154,7 @@ export default class SelectionToolbarPlugin extends Plugin {
       commands: commandsFor(this.settings.enabledCommandIds),
       resolveEditor: (view) => this.resolveEditor(view),
       onAI: aiReady ? (view, editor) => this.aiPanel.open(view, editor) : undefined,
+      maxButtons: this.settings.toolbarMaxButtons,
     });
     this.addChild(this.toolbar);
   }
