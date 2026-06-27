@@ -4,6 +4,10 @@ A floating formatting toolbar for [Obsidian](https://obsidian.md) that appears w
 
 The toolbar is themed entirely via Obsidian's CSS variables, so it matches your active theme (light, dark, or any community theme) automatically.
 
+![Floating formatting toolbar over a text selection](docs/toolbar.png)
+
+![AI actions panel with a before/after diff preview](docs/ai-panel.png)
+
 ## Features
 
 - **Inline formatting** (toggle on/off): bold, italic, strikethrough, highlight, inline code.
@@ -11,6 +15,24 @@ The toolbar is themed entirely via Obsidian's CSS variables, so it matches your 
 - **Insert**: link, internal `[[link]]`, clear formatting.
 - **AI text actions** (✨): Improve, Fix grammar, Shorten, Expand, Change tone, Translate, and a free-form custom prompt — streamed from Claude.
 - Configurable: enable/disable individual buttons, show delay, minimum selection length.
+
+## Installation
+
+**Requirements:** Obsidian 1.4+ (desktop), and [Claude Code](https://www.anthropic.com/claude-code) installed and signed in (run `claude` once in a terminal). AI actions use your Claude subscription via the local CLI — no API key.
+
+### Via BRAT (easiest today)
+
+1. Install the **BRAT** community plugin.
+2. BRAT → *Add beta plugin* → `mariomile/obsidian-selection-toolbar`.
+3. Enable **Selection Toolbar** under Community plugins. BRAT auto-updates it.
+
+### Manual
+
+1. Download `main.js`, `manifest.json`, and `styles.css` from the [latest release](https://github.com/mariomile/obsidian-selection-toolbar/releases/latest).
+2. Copy them into `<your-vault>/.obsidian/plugins/selection-toolbar/`.
+3. Reload Obsidian and enable the plugin.
+
+> Community-plugins directory (one-click install) submission is planned — see below.
 
 ## AI actions & privacy
 
