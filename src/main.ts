@@ -155,6 +155,8 @@ export default class SelectionToolbarPlugin extends Plugin {
       resolveEditor: (view) => this.resolveEditor(view),
       onAI: aiReady ? (view, editor) => this.aiPanel.open(view, editor) : undefined,
       maxButtons: this.settings.toolbarMaxButtons,
+      multiRow: this.settings.toolbarMultiRow,
+      columns: this.settings.toolbarColumns,
     });
     this.addChild(this.toolbar);
   }

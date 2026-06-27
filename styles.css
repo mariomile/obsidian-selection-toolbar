@@ -81,6 +81,13 @@
   max-width: 360px;
 }
 
+/* Multi-row layout — all buttons wrap onto a compact grid. */
+.selection-toolbar-grid {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  max-width: calc(var(--stb-cols, 7) * 33px + 8px);
+}
+
 /* ---------- AI panel ---------- */
 .selection-ai-panel {
   position: fixed;
@@ -235,11 +242,27 @@
 }
 
 .selection-ai-working-label {
-  font-variant-numeric: tabular-nums;
+  font-size: var(--font-ui-small);
+  /* Shimmer the text to convey "working" without a seconds counter. */
+  background: linear-gradient(
+    90deg,
+    var(--text-muted) 35%,
+    var(--text-normal) 50%,
+    var(--text-muted) 65%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: selection-ai-shimmer 1.6s linear infinite;
 }
 
 @keyframes selection-ai-spin {
   to { transform: rotate(360deg); }
+}
+
+@keyframes selection-ai-shimmer {
+  to { background-position: -200% 0; }
 }
 
 .selection-ai-caret {
@@ -295,5 +318,10 @@
   }
   .selection-ai-caret {
     animation: none;
+  }
+  .selection-ai-working-label {
+    animation: none;
+    color: var(--text-muted);
+    -webkit-text-fill-color: var(--text-muted);
   }
 }

@@ -56,9 +56,6 @@ export class AIPanel extends Component {
   private lastInput = "";
 
   // Working-state UI
-  private startedAt = 0;
-  private timerHandle: number | null = null;
-  private workingLabel: HTMLElement | null = null;
   private firstDelta = false;
   private textEl: HTMLElement | null = null;
 
@@ -216,7 +213,6 @@ export class AIPanel extends Component {
         onDelta: (delta) => this.onDelta(delta, direct),
       });
     } catch (e) {
-      this.stopWorking();
       this.generating = false;
       if (direct) this.restoreDirect();
       if (isAbort(e)) {
@@ -232,14 +228,12 @@ export class AIPanel extends Component {
       return;
     }
 
-    this.stopWorking();
     this.generating = false;
     if (direct) {
       this.close();
       return;
     }
-    const elapsed = ((Date.now() - this.startedAt) / 1000).toFixed(1);
-    this.setStatus(`Done in ${elapsed}s.`);
+    this.setStatus("Done.");
     this.canDiff =
       cfg.showDiff &&
       this.original.trim().length > 0 &&
@@ -261,7 +255,6 @@ export class AIPanel extends Component {
     if (!this.firstDelta) {
       // First token arrived: drop the working spinner, start showing text.
       this.firstDelta = true;
-      this.stopWorking();
       this.outputEl.empty();
       this.outputEl.removeClass("is-empty");
       this.textEl = this.outputEl.createSpan({ cls: "selection-ai-text" });
@@ -276,29 +269,15 @@ export class AIPanel extends Component {
   private startWorking(direct: boolean): void {
     this.firstDelta = false;
     this.textEl = null;
-    this.startedAt = Date.now();
     this.outputEl.empty();
     this.outputEl.removeClass("is-empty");
     const w = this.outputEl.createDiv({ cls: "selection-ai-working" });
     w.createSpan({ cls: "selection-ai-spinner" });
-    this.workingLabel = w.createSpan({ cls: "selection-ai-working-label" });
-    this.setStatus(direct ? "Writing into the editor…" : "");
-    this.tick();
-    this.timerHandle = window.setInterval(() => this.tick(), 150);
-  }
-
-  private tick(): void {
-    if (!this.workingLabel) return;
-    const s = ((Date.now() - this.startedAt) / 1000).toFixed(1);
-    this.workingLabel.setText(`Claude is working… ${s}s`);
-  }
-
-  private stopWorking(): void {
-    if (this.timerHandle != null) {
-      window.clearInterval(this.timerHandle);
-      this.timerHandle = null;
-    }
-    this.workingLabel = null;
+    w.createSpan({
+      cls: "selection-ai-working-label",
+      text: direct ? "Writing into the editor…" : "Claude is working…",
+    });
+    this.setStatus("");
   }
 
   private renderOutput(): void {
@@ -398,7 +377,6 @@ export class AIPanel extends Component {
   close(): void {
     this.controller?.abort();
     this.controller = null;
-    this.stopWorking();
     this.cleanupAutoUpdate?.();
     this.cleanupAutoUpdate = null;
     this.el.hide();
@@ -429,7 +407,6 @@ export class AIPanel extends Component {
 
   onunload(): void {
     this.controller?.abort();
-    this.stopWorking();
     this.cleanupAutoUpdate?.();
     this.el.remove();
   }

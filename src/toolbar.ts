@@ -19,6 +19,10 @@ export interface ToolbarDeps {
   onAI?: (view: EditorView, editor: Editor) => void;
   /** Max command buttons in the bar before the rest go to a ⋯ menu (0 = all). */
   maxButtons: number;
+  /** Lay buttons across multiple rows (grid) instead of one row + ⋯ menu. */
+  multiRow: boolean;
+  /** Approx. buttons per row in multi-row mode. */
+  columns: number;
 }
 
 /**
@@ -59,6 +63,22 @@ export class SelectionToolbar extends Component {
     this.el.empty();
     this.buttons.clear();
     this.destroyOverflow();
+    this.el.toggleClass("selection-toolbar-grid", this.deps.multiRow);
+
+    // Multi-row: all buttons wrap onto a grid, no overflow menu.
+    if (this.deps.multiRow) {
+      this.el.style.setProperty("--stb-cols", String(this.deps.columns));
+      for (const cmd of this.deps.commands) {
+        const btn = this.makeButton(this.el, cmd.icon, cmd.label, () => this.runCommand(cmd));
+        this.buttons.set(cmd.id, btn);
+      }
+      if (this.deps.onAI) {
+        const ai = this.makeButton(this.el, "wand-2", "AI actions", () => this.runAI());
+        ai.addClass("is-ai");
+      }
+      return;
+    }
+    this.el.style.removeProperty("--stb-cols");
 
     const cmds = this.deps.commands;
     const max = this.deps.maxButtons;

@@ -12,6 +12,10 @@ export interface SelectionToolbarSettings {
   minSelectionLength: number;
   /** Max command buttons in the bar before extras move to a ⋯ menu (0 = all). */
   toolbarMaxButtons: number;
+  /** Lay buttons across multiple rows (grid) instead of one row + ⋯ menu. */
+  toolbarMultiRow: boolean;
+  /** Approx. buttons per row when multi-row is on. */
+  toolbarColumns: number;
 
   // AI — via the local Claude Code CLI (subscription).
   aiEnabled: boolean;
@@ -33,6 +37,8 @@ export const DEFAULT_SETTINGS: SelectionToolbarSettings = {
   showDelayMs: 120,
   minSelectionLength: 1,
   toolbarMaxButtons: 14,
+  toolbarMultiRow: false,
+  toolbarColumns: 7,
 
   aiEnabled: true,
   claudeCliPath: "",
@@ -90,18 +96,45 @@ export class SelectionToolbarSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("Max buttons in the bar")
-      .setDesc("Beyond this, extra buttons move into a ⋯ overflow menu. 0 = show all in one row.")
-      .addSlider((s) =>
-        s
-          .setLimits(0, 24, 1)
-          .setValue(this.plugin.settings.toolbarMaxButtons)
-          .setDynamicTooltip()
-          .onChange(async (v) => {
-            this.plugin.settings.toolbarMaxButtons = v;
-            await this.plugin.saveSettings();
-          })
+      .setName("Multi-row toolbar")
+      .setDesc("Lay all buttons out on multiple rows (grid) instead of one row with a ⋯ overflow menu.")
+      .addToggle((tg) =>
+        tg.setValue(this.plugin.settings.toolbarMultiRow).onChange(async (v) => {
+          this.plugin.settings.toolbarMultiRow = v;
+          await this.plugin.saveSettings();
+          this.display();
+        })
       );
+
+    if (this.plugin.settings.toolbarMultiRow) {
+      new Setting(containerEl)
+        .setName("Buttons per row")
+        .setDesc("Roughly how many buttons fit on each row before wrapping.")
+        .addSlider((s) =>
+          s
+            .setLimits(3, 10, 1)
+            .setValue(this.plugin.settings.toolbarColumns)
+            .setDynamicTooltip()
+            .onChange(async (v) => {
+              this.plugin.settings.toolbarColumns = v;
+              await this.plugin.saveSettings();
+            })
+        );
+    } else {
+      new Setting(containerEl)
+        .setName("Max buttons in the bar")
+        .setDesc("Beyond this, extra buttons move into a ⋯ overflow menu. 0 = show all in one row.")
+        .addSlider((s) =>
+          s
+            .setLimits(0, 24, 1)
+            .setValue(this.plugin.settings.toolbarMaxButtons)
+            .setDynamicTooltip()
+            .onChange(async (v) => {
+              this.plugin.settings.toolbarMaxButtons = v;
+              await this.plugin.saveSettings();
+            })
+        );
+    }
 
     // ---- Commands ----
     new Setting(containerEl).setName("Commands").setHeading();

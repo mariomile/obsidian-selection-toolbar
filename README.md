@@ -6,6 +6,10 @@ The toolbar is themed entirely via Obsidian's CSS variables, so it matches your 
 
 ![Floating formatting toolbar over a text selection](docs/toolbar.png)
 
+![Multi-row toolbar layout](docs/toolbar-grid.png)
+
+![AI working — animated loader while Claude runs](docs/ai-working.png)
+
 ![AI actions panel with a before/after diff preview](docs/ai-panel.png)
 
 ## Features

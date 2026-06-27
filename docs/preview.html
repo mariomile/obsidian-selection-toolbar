@@ -39,7 +39,7 @@
 
   html, body {
     margin: 0;
-    background: #121212;
+    background: #060608;
     font-family: var(--font-text);
     color: var(--text-normal);
   }
@@ -54,8 +54,8 @@
   }
 
   .card {
-    background: var(--background-primary);
-    border: 1px solid var(--background-modifier-border);
+    background: #0e0e10;
+    border: 1px solid #232325;
     border-radius: 14px;
     padding: 26px 28px 30px;
     position: relative;
@@ -125,6 +125,59 @@
     <p class="editor-line">Selection Toolbar makes <span class="sel">formatting and AI edits</span> one click away — themed to match your vault.</p>
   </div>
 
+  <!-- Shot 1b: multi-row (grid) toolbar -->
+  <div class="card" id="shot-grid">
+    <p class="caption">Multi-row toolbar (optional)</p>
+    <div class="float">
+      <div class="selection-toolbar selection-toolbar-grid" role="toolbar" style="--stb-cols: 7;">
+        <div class="selection-toolbar-btn is-active" aria-label="Bold"><i data-lucide="bold"></i></div>
+        <div class="selection-toolbar-btn" aria-label="Italic"><i data-lucide="italic"></i></div>
+        <div class="selection-toolbar-btn" aria-label="Strikethrough"><i data-lucide="strikethrough"></i></div>
+        <div class="selection-toolbar-btn" aria-label="Highlight"><i data-lucide="highlighter"></i></div>
+        <div class="selection-toolbar-btn" aria-label="Inline code"><i data-lucide="code"></i></div>
+        <div class="selection-toolbar-btn" aria-label="Heading 1"><i data-lucide="heading-1"></i></div>
+        <div class="selection-toolbar-btn" aria-label="Heading 2"><i data-lucide="heading-2"></i></div>
+        <div class="selection-toolbar-btn" aria-label="Heading 3"><i data-lucide="heading-3"></i></div>
+        <div class="selection-toolbar-btn" aria-label="Quote"><i data-lucide="quote"></i></div>
+        <div class="selection-toolbar-btn" aria-label="Bullet list"><i data-lucide="list"></i></div>
+        <div class="selection-toolbar-btn" aria-label="Numbered list"><i data-lucide="list-ordered"></i></div>
+        <div class="selection-toolbar-btn" aria-label="Checklist"><i data-lucide="square-check"></i></div>
+        <div class="selection-toolbar-btn" aria-label="Code block"><i data-lucide="square-code"></i></div>
+        <div class="selection-toolbar-btn" aria-label="Comment"><i data-lucide="message-square"></i></div>
+        <div class="selection-toolbar-btn" aria-label="Link"><i data-lucide="link"></i></div>
+        <div class="selection-toolbar-btn" aria-label="Internal link"><i data-lucide="file-symlink"></i></div>
+        <div class="selection-toolbar-btn" aria-label="Clear formatting"><i data-lucide="remove-formatting"></i></div>
+        <div class="selection-toolbar-btn is-ai" aria-label="AI actions"><i data-lucide="wand-2"></i></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shot 1c: AI working loader -->
+  <div class="card" id="shot-working">
+    <p class="caption">AI working — animated, no seconds counter</p>
+    <div class="panel-stage">
+      <div class="selection-ai-panel">
+        <div class="selection-ai-actions">
+          <div class="selection-ai-action"><span><i data-lucide="sparkles"></i></span><span>Improve</span></div>
+          <div class="selection-ai-action"><span><i data-lucide="spell-check"></i></span><span>Fix grammar</span></div>
+          <div class="selection-ai-action"><span><i data-lucide="languages"></i></span><span>Translate</span></div>
+        </div>
+        <div class="selection-ai-prompt-row">
+          <input class="selection-ai-prompt" type="text" value="" placeholder="Describe an edit, or pick an action above…" />
+        </div>
+        <div class="selection-ai-output">
+          <div class="selection-ai-working">
+            <span class="selection-ai-spinner"></span>
+            <span class="selection-ai-working-label">Claude is working…</span>
+          </div>
+        </div>
+        <div class="selection-ai-footer">
+          <button class="selection-ai-btn">Stop</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Shot 2: AI panel with diff preview -->
   <div class="card" id="shot-ai">
     <p class="caption">AI actions — preview with diff, on your Claude subscription</p>
@@ -155,6 +208,11 @@
   </div>
 
 </div>
-<script>lucide.createIcons();</script>
+<script>
+  // #<card-id> in the URL isolates a single card (used for tight screenshots).
+  const only = location.hash.slice(1);
+  if (only) document.querySelectorAll(".card").forEach((c) => { if (c.id !== only) c.remove(); });
+  lucide.createIcons();
+</script>
 </body>
 </html>
