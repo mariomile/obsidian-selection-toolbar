@@ -1,12 +1,20 @@
-import { Plugin, MarkdownView, debounce, type Editor, type Debouncer } from "obsidian";
+import { Plugin, MarkdownView, Notice, debounce, type Editor, type Debouncer } from "obsidian";
 import type { EditorView } from "@codemirror/view";
 import { SelectionToolbar } from "./toolbar";
-import { AIPanel, type OpenOptions } from "./ai/panel";
-import { resolveCli, testConnection, type ResolvedCli } from "./ai/client";
+import { AIPanel, type OpenOptions, type AIConfig } from "./ai/panel";
+import {
+  resolveCli,
+  testConnection,
+  streamCompletion,
+  isAbort,
+  describeError,
+  type ResolvedCli,
+} from "./ai/client";
 import { selectionToolbarExtension, type SelectionEvent } from "./selection-extension";
+import { inlineExtension, setInline, patchInline, getInline, type InlineCallbacks } from "./ai/inline";
 import { commandsFor, COMMANDS } from "./commands/registry";
 import { AI_ACTIONS, customToAction } from "./ai/actions";
-import type { AIAction } from "./ai/types";
+import { buildUserMessage, type AIAction } from "./ai/types";
 import {
   type SelectionToolbarSettings,
   DEFAULT_SETTINGS,
@@ -20,6 +28,8 @@ export default class SelectionToolbarPlugin extends Plugin {
   private mouseDown = false;
   private cli: ResolvedCli = { bin: "claude", pathEnv: process.env.PATH ?? "" };
   private debouncedSelection!: Debouncer<[SelectionEvent], void>;
+  private inlineAbort: AbortController | null = null;
+  private lastInline: { view: EditorView; action: AIAction; input: string } | null = null;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -27,14 +37,9 @@ export default class SelectionToolbarPlugin extends Plugin {
 
     // AI panel is created once; it reads live config + actions via callbacks.
     this.aiPanel = new AIPanel({
-      getConfig: () => ({
-        cli: this.cli,
-        model: this.settings.aiModel,
-        modelQuick: this.settings.aiModelQuick,
-        outputMode: this.settings.aiOutputMode,
-        showDiff: this.settings.aiShowDiff,
-      }),
+      getConfig: () => this.aiConfig(),
       getActions: () => this.aiActions(),
+      runInline: (view, editor, action, input) => this.runInline(view, editor, action, input),
     });
     this.addChild(this.aiPanel);
 
@@ -59,7 +64,9 @@ export default class SelectionToolbarPlugin extends Plugin {
     });
 
     // The detector forwards raw events; we debounce here so the delay is live.
+    // inlineExtension renders the in-editor AI loading/diff decorations.
     this.registerEditorExtension([
+      inlineExtension(),
       selectionToolbarExtension((ev) => this.debouncedSelection(ev)),
     ]);
 
@@ -146,6 +153,96 @@ export default class SelectionToolbarPlugin extends Plugin {
   async runConnectionTest(): Promise<{ ok: boolean; message: string }> {
     await this.refreshCli();
     return testConnection(this.cli, this.settings.aiModelQuick || "haiku");
+  }
+
+  private aiConfig(): AIConfig {
+    return {
+      cli: this.cli,
+      model: this.settings.aiModel,
+      modelQuick: this.settings.aiModelQuick,
+      outputMode: this.settings.aiOutputMode,
+      showDiff: this.settings.aiShowDiff,
+    };
+  }
+
+  /** Run an AI action inline in the editor (loading pill → diff → accept/discard). */
+  private runInline(view: EditorView, editor: Editor, action: AIAction, input: string): void {
+    const from = editor.posToOffset(editor.getCursor("from"));
+    const to = editor.posToOffset(editor.getCursor("to"));
+    const original = editor.getSelection();
+    if (!original) return;
+    this.lastInline = { view, action, input };
+    this.streamInline(view, from, to, original, action, input);
+  }
+
+  private streamInline(
+    view: EditorView,
+    from: number,
+    to: number,
+    original: string,
+    action: AIAction,
+    input: string
+  ): void {
+    this.inlineAbort?.abort();
+    const controller = new AbortController();
+    this.inlineAbort = controller;
+    const cfg = this.aiConfig();
+    const model = action.model || (action.quick ? cfg.modelQuick : cfg.model);
+    const clear = () => view.dispatch({ effects: setInline.of(null) });
+
+    const cb: InlineCallbacks = {
+      onAccept: () => {
+        const s = getInline(view);
+        if (s) {
+          view.dispatch({
+            changes: { from: s.from, to: s.to, insert: s.suggestion },
+            effects: setInline.of(null),
+          });
+        }
+        this.inlineAbort = null;
+      },
+      onDiscard: () => {
+        controller.abort();
+        clear();
+        this.inlineAbort = null;
+      },
+      onRetry: () => {
+        const li = this.lastInline;
+        if (!li) return;
+        const s = getInline(view);
+        this.streamInline(view, s ? s.from : from, s ? s.to : to, original, li.action, li.input);
+      },
+      onStop: () => controller.abort(),
+    };
+
+    view.dispatch({
+      effects: setInline.of({ from, to, original, suggestion: "", status: "loading", cb }),
+    });
+
+    let acc = "";
+    void streamCompletion({
+      cli: cfg.cli,
+      model,
+      system: action.system,
+      user: buildUserMessage(action, original, input),
+      signal: controller.signal,
+      onDelta: (d) => {
+        acc += d;
+      },
+    })
+      .then(() => {
+        if (controller.signal.aborted) return;
+        view.dispatch({ effects: patchInline.of({ suggestion: acc.trim(), status: "review" }) });
+      })
+      .catch((e) => {
+        if (isAbort(e)) {
+          if (acc.trim()) view.dispatch({ effects: patchInline.of({ suggestion: acc.trim(), status: "review" }) });
+          else clear();
+          return;
+        }
+        clear();
+        new Notice(describeError(e));
+      });
   }
 
   private buildToolbar(): void {

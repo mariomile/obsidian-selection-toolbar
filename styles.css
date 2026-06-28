@@ -301,6 +301,57 @@
   background: color-mix(in srgb, var(--color-green) 16%, transparent);
 }
 
+/* ---------- Inline AI edit (in-editor, Notion-style) ---------- */
+.sk-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 6px 0;
+  padding: 10px 12px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-s);
+  font-size: var(--font-ui-small);
+  white-space: normal;
+  user-select: none;
+}
+
+.sk-inline-loading {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.sk-inline-stop {
+  margin-left: auto;
+  font-size: var(--font-ui-smaller);
+  padding: 3px 10px;
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  color: var(--text-normal);
+  background: var(--interactive-normal);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.sk-inline-stop:hover {
+  background: var(--interactive-hover);
+}
+
+.sk-inline-diff {
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-normal);
+}
+
+.sk-inline-bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
 /* ---------- Custom action editor (settings) ---------- */
 .selection-custom-action {
   border: 1px solid var(--background-modifier-border);

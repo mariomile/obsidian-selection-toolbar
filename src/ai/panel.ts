@@ -3,6 +3,7 @@ import type { EditorView } from "@codemirror/view";
 import { computePosition, autoUpdate, offset, flip, shift } from "@floating-ui/dom";
 import { buildUserMessage, type AIAction } from "./types";
 import { streamCompletion, describeError, isAbort, type ResolvedCli } from "./client";
+import { wordDiff, DIFF_CHAR_CAP } from "./diff";
 import { selectionRect } from "../utils/editor";
 
 export interface AIConfig {
@@ -20,6 +21,8 @@ export interface AIPanelDeps {
   getConfig: () => AIConfig;
   /** Built-in + user-defined actions, re-read on every open. */
   getActions: () => AIAction[];
+  /** Run the action inline in the editor (Notion-style). Used for preview mode. */
+  runInline?: (view: EditorView, editor: Editor, action: AIAction, input: string) => void;
 }
 
 export interface OpenOptions {
@@ -28,8 +31,6 @@ export interface OpenOptions {
   /** Re-run the last action on the new selection. */
   repeat?: boolean;
 }
-
-const DIFF_CHAR_CAP = 6000;
 
 /** Floating panel anchored to the selection: pick an action → stream Claude. */
 export class AIPanel extends Component {
@@ -40,6 +41,7 @@ export class AIPanel extends Component {
   private statusEl!: HTMLElement;
   private footerEl!: HTMLElement;
 
+  private view: EditorView | null = null;
   private editor: Editor | null = null;
   private from: EditorPosition | null = null;
   private to: EditorPosition | null = null;
@@ -124,6 +126,7 @@ export class AIPanel extends Component {
 
   open(view: EditorView, editor: Editor, opts: OpenOptions = {}): void {
     this.reset();
+    this.view = view;
     this.editor = editor;
     this.from = editor.getCursor("from");
     this.to = editor.getCursor("to");
@@ -195,6 +198,14 @@ export class AIPanel extends Component {
 
     this.lastAction = action;
     this.lastInput = input;
+
+    // Preview mode → run inline in the editor (Notion-style); the panel closes.
+    if (cfg.outputMode !== "direct" && this.view && this.deps.runInline) {
+      this.deps.runInline(this.view, this.editor, action, input);
+      this.close();
+      return;
+    }
+
     this.generating = true;
     this.result = "";
     this.showingDiff = false;
@@ -394,6 +405,7 @@ export class AIPanel extends Component {
   }
 
   private reset(): void {
+    this.view = null;
     this.editor = null;
     this.from = null;
     this.to = null;
@@ -425,44 +437,4 @@ interface FooterButton {
   label: string;
   cta?: boolean;
   onClick: () => void;
-}
-
-type DiffSeg = { type: "eq" | "del" | "add"; text: string };
-
-/** Word-level diff (LCS over whitespace/word tokens). No dependencies. */
-function wordDiff(a: string, b: string): DiffSeg[] {
-  const A = a.match(/\s+|[^\s]+/g) ?? [];
-  const B = b.match(/\s+|[^\s]+/g) ?? [];
-  const n = A.length;
-  const m = B.length;
-  const dp: number[][] = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
-  for (let i = n - 1; i >= 0; i--) {
-    for (let j = m - 1; j >= 0; j--) {
-      dp[i][j] = A[i] === B[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
-    }
-  }
-  const segs: DiffSeg[] = [];
-  const push = (type: DiffSeg["type"], text: string) => {
-    const last = segs[segs.length - 1];
-    if (last && last.type === type) last.text += text;
-    else segs.push({ type, text });
-  };
-  let i = 0;
-  let j = 0;
-  while (i < n && j < m) {
-    if (A[i] === B[j]) {
-      push("eq", A[i]);
-      i++;
-      j++;
-    } else if (dp[i + 1][j] >= dp[i][j + 1]) {
-      push("del", A[i]);
-      i++;
-    } else {
-      push("add", B[j]);
-      j++;
-    }
-  }
-  while (i < n) push("del", A[i++]);
-  while (j < m) push("add", B[j++]);
-  return segs;
 }
