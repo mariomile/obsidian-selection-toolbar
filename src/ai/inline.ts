@@ -62,7 +62,9 @@ class InlineWidget extends WidgetType {
     if (this.s.status === "loading") {
       box.addClass("sk-inline-loading");
       box.createSpan({ cls: "selection-ai-spinner" });
-      box.createSpan({ cls: "selection-ai-working-label", text: "Claude is working…" });
+      const typing = box.createSpan({ cls: "sk-inline-typing" });
+      typing.createSpan({ cls: "sk-inline-caret", text: "|" });
+      typing.createSpan({ cls: "selection-ai-working-label", text: "Claude is working…" });
       const stop = box.createEl("button", { cls: "sk-inline-stop", text: "Stop" });
       stop.onclick = (e) => {
         e.preventDefault();
