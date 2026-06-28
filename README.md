@@ -1,4 +1,4 @@
-# Selection Toolbar
+# Selection Sidekick
 
 A floating formatting toolbar for [Obsidian](https://obsidian.md) that appears when you select text in the editor — quick access to the most common Markdown commands, plus AI text actions powered by Claude. Desktop only.
 
@@ -28,12 +28,12 @@ The toolbar is themed entirely via Obsidian's CSS variables, so it matches your 
 
 1. Install the **BRAT** community plugin.
 2. BRAT → *Add beta plugin* → `mariomile/obsidian-selection-toolbar`.
-3. Enable **Selection Toolbar** under Community plugins. BRAT auto-updates it.
+3. Enable **Selection Sidekick** under Community plugins. BRAT auto-updates it.
 
 ### Manual
 
 1. Download `main.js`, `manifest.json`, and `styles.css` from the [latest release](https://github.com/mariomile/obsidian-selection-toolbar/releases/latest).
-2. Copy them into `<your-vault>/.obsidian/plugins/selection-toolbar/`.
+2. Copy them into `<your-vault>/.obsidian/plugins/selection-sidekick/`.
 3. Reload Obsidian and enable the plugin.
 
 > Community-plugins directory (one-click install) submission is planned — see below.
