@@ -82,12 +82,11 @@ export class AIPanel extends Component {
   }
 
   private build(): void {
-    this.actionsEl = this.el.createDiv({ cls: "selection-ai-actions" });
-
+    // Prompt input on top, then the vertical action list (Notion-style menu).
     const row = this.el.createDiv({ cls: "selection-ai-prompt-row" });
     this.promptInput = row.createEl("input", {
       cls: "selection-ai-prompt",
-      attr: { type: "text", placeholder: "Describe an edit, or pick an action above…" },
+      attr: { type: "text", placeholder: "Ask Claude, or pick an action…" },
     });
     this.registerDomEvent(this.promptInput, "keydown", (e: KeyboardEvent) => {
       if (e.key === "Enter") {
@@ -98,6 +97,8 @@ export class AIPanel extends Component {
         this.close();
       }
     });
+
+    this.actionsEl = this.el.createDiv({ cls: "selection-ai-actions" });
 
     this.outputEl = this.el.createDiv({ cls: "selection-ai-output is-empty" });
     this.outputEl.setText("Pick an action or type an instruction.");
@@ -419,7 +420,7 @@ export class AIPanel extends Component {
     this.canDiff = false;
     this.showingDiff = false;
     this.promptInput.value = "";
-    this.promptInput.placeholder = "Describe an edit, or pick an action above…";
+    this.promptInput.placeholder = "Ask Claude, or pick an action…";
     this.outputEl.addClass("is-empty");
     this.outputEl.setText("Pick an action or type an instruction.");
     this.setStatus("");
