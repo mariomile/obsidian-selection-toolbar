@@ -1,6 +1,6 @@
 {
   "name": "obsidian-selection-toolbar",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Floating selection formatting toolbar with Claude AI text actions for Obsidian",
   "main": "main.js",
   "scripts": {
