@@ -1,7 +1,7 @@
 {
   "id": "selection-toolbar",
   "name": "Selection Toolbar",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "minAppVersion": "1.4.0",
   "description": "A floating formatting toolbar that appears when you select text — bold, italic, headings, lists, links and AI text actions, themed to match your vault.",
   "author": "Mario Miletta",
