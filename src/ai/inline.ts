@@ -51,9 +51,7 @@ class InlineWidget extends WidgetType {
   }
 
   eq(other: InlineWidget): boolean {
-    if (other.s.status !== this.s.status) return false;
-    // Loading is visually stable (just the pill) → never rebuild while streaming.
-    return this.s.status === "review" ? other.s.suggestion === this.s.suggestion : true;
+    return other.s.status === this.s.status && other.s.suggestion === this.s.suggestion;
   }
 
   toDOM(): HTMLElement {
@@ -61,18 +59,22 @@ class InlineWidget extends WidgetType {
     box.className = "sk-inline";
 
     if (this.s.status === "loading") {
-      box.addClass("sk-inline-loading");
-      box.createSpan({ cls: "sk-inline-spinner" });
-      const typing = box.createSpan({ cls: "sk-inline-typing" });
-      typing.createSpan({ cls: "sk-inline-caret" });
-      typing.createSpan({ cls: "sk-inline-label", text: "Claude is working…" });
-      const stop = box.createEl("button", { cls: "sk-inline-stop", attr: { "aria-label": "Stop" } });
-      setIcon(stop.createSpan({ cls: "sk-inline-stop-icon" }), "square");
-      stop.createSpan({ text: "Stop" });
-      stop.onclick = (e) => {
-        e.preventDefault();
-        this.s.cb.onStop();
-      };
+      if (this.s.suggestion) {
+        // Streaming: show the result appearing live, with a trailing caret.
+        const txt = box.createDiv({ cls: "sk-inline-streamtext" });
+        txt.setText(this.s.suggestion);
+        txt.createSpan({ cls: "sk-inline-caret" });
+        const bar = box.createDiv({ cls: "sk-inline-bar" });
+        this.makeStop(bar);
+      } else {
+        // Pre-first-token: the working pill.
+        box.addClass("sk-inline-loading");
+        box.createSpan({ cls: "sk-inline-spinner" });
+        const typing = box.createSpan({ cls: "sk-inline-typing" });
+        typing.createSpan({ cls: "sk-inline-caret" });
+        typing.createSpan({ cls: "sk-inline-label", text: "Claude is working…" });
+        this.makeStop(box);
+      }
       return box;
     }
 
@@ -98,6 +100,16 @@ class InlineWidget extends WidgetType {
     btn("Retry", false, () => this.s.cb.onRetry());
     btn("Discard", false, () => this.s.cb.onDiscard());
     return box;
+  }
+
+  private makeStop(parent: HTMLElement): void {
+    const stop = parent.createEl("button", { cls: "sk-inline-stop", attr: { "aria-label": "Stop" } });
+    setIcon(stop.createSpan({ cls: "sk-inline-stop-icon" }), "square");
+    stop.createSpan({ text: "Stop" });
+    stop.onclick = (e) => {
+      e.preventDefault();
+      this.s.cb.onStop();
+    };
   }
 
   ignoreEvent(): boolean {

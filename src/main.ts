@@ -220,6 +220,7 @@ export default class SelectionToolbarPlugin extends Plugin {
     });
 
     let acc = "";
+    let lastTick = 0;
     void streamCompletion({
       cli: cfg.cli,
       model,
@@ -228,6 +229,12 @@ export default class SelectionToolbarPlugin extends Plugin {
       signal: controller.signal,
       onDelta: (d) => {
         acc += d;
+        // Show the result appearing live (throttled to limit re-renders).
+        const now = Date.now();
+        if (now - lastTick >= 60) {
+          lastTick = now;
+          view.dispatch({ effects: patchInline.of({ suggestion: acc, status: "loading" }) });
+        }
       },
     })
       .then(() => {

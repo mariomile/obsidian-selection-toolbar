@@ -404,11 +404,19 @@
   height: 12px;
 }
 
-.sk-inline-diff {
+.sk-inline-diff,
+.sk-inline-streamtext {
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
   color: var(--text-normal);
+}
+
+/* Caret trailing the live-streaming text. */
+.sk-inline-streamtext .sk-inline-caret {
+  display: inline-block;
+  vertical-align: text-bottom;
+  margin-left: 1px;
 }
 
 .sk-inline-bar {
