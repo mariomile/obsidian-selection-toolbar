@@ -1,5 +1,6 @@
 import { EditorView, Decoration, WidgetType } from "@codemirror/view";
 import { StateField, StateEffect, type Extension } from "@codemirror/state";
+import { setIcon } from "obsidian";
 import { wordDiff } from "./diff";
 
 export interface InlineCallbacks {
@@ -61,11 +62,13 @@ class InlineWidget extends WidgetType {
 
     if (this.s.status === "loading") {
       box.addClass("sk-inline-loading");
-      box.createSpan({ cls: "selection-ai-spinner" });
+      box.createSpan({ cls: "sk-inline-spinner" });
       const typing = box.createSpan({ cls: "sk-inline-typing" });
-      typing.createSpan({ cls: "sk-inline-caret", text: "|" });
-      typing.createSpan({ cls: "selection-ai-working-label", text: "Claude is working…" });
-      const stop = box.createEl("button", { cls: "sk-inline-stop", text: "Stop" });
+      typing.createSpan({ cls: "sk-inline-caret" });
+      typing.createSpan({ cls: "sk-inline-label", text: "Claude is working…" });
+      const stop = box.createEl("button", { cls: "sk-inline-stop", attr: { "aria-label": "Stop" } });
+      setIcon(stop.createSpan({ cls: "sk-inline-stop-icon" }), "square");
+      stop.createSpan({ text: "Stop" });
       stop.onclick = (e) => {
         e.preventDefault();
         this.s.cb.onStop();

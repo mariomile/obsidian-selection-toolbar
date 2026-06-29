@@ -36,7 +36,7 @@ export interface OpenOptions {
 export class AIPanel extends Component {
   private el: HTMLElement;
   private actionsEl!: HTMLElement;
-  private promptInput!: HTMLInputElement;
+  private promptInput!: HTMLTextAreaElement;
   private outputEl!: HTMLElement;
   private statusEl!: HTMLElement;
   private footerEl!: HTMLElement;
@@ -82,14 +82,16 @@ export class AIPanel extends Component {
   }
 
   private build(): void {
-    // Prompt input on top, then the vertical action list (Notion-style menu).
+    this.actionsEl = this.el.createDiv({ cls: "selection-ai-actions" });
+
     const row = this.el.createDiv({ cls: "selection-ai-prompt-row" });
-    this.promptInput = row.createEl("input", {
+    this.promptInput = row.createEl("textarea", {
       cls: "selection-ai-prompt",
-      attr: { type: "text", placeholder: "Ask Claude, or pick an action…" },
+      attr: { rows: "2", placeholder: "Ask Claude, or pick an action…" },
     });
+    // Enter submits; Shift+Enter inserts a newline (multi-line prompt).
     this.registerDomEvent(this.promptInput, "keydown", (e: KeyboardEvent) => {
-      if (e.key === "Enter") {
+      if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         this.runFromInput();
       } else if (e.key === "Escape") {
@@ -97,8 +99,6 @@ export class AIPanel extends Component {
         this.close();
       }
     });
-
-    this.actionsEl = this.el.createDiv({ cls: "selection-ai-actions" });
 
     this.outputEl = this.el.createDiv({ cls: "selection-ai-output is-empty" });
     this.outputEl.setText("Pick an action or type an instruction.");

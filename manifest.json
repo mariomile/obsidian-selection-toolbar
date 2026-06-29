@@ -1,6 +1,6 @@
 {
   "id": "selection-sidekick",
-  "name": "Selection Sidekick",
+  "name": "AI Selection Toolbar",
   "version": "0.2.0",
   "minAppVersion": "1.4.0",
   "description": "A floating formatting toolbar that appears when you select text — bold, italic, headings, lists, links and AI text actions, themed to match your vault.",
