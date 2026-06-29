@@ -155,17 +155,20 @@
 
   <!-- Shot 1c: AI working loader -->
   <div class="card" id="shot-working">
-    <p class="caption">AI working — inline loader (spinner + blinking caret)</p>
+    <p class="caption">AI working — skeleton preview (no spinner)</p>
     <div class="sk-inline sk-inline-loading">
-      <span class="sk-inline-spinner"></span>
-      <span class="sk-inline-typing">
-        <span class="sk-inline-caret"></span>
-        <span class="sk-inline-label">Claude is working…</span>
-      </span>
-      <button class="sk-inline-stop">
-        <span class="sk-inline-stop-icon"><i data-lucide="square"></i></span>
-        <span>Stop</span>
-      </button>
+      <div class="sk-inline-skeleton">
+        <div class="sk-inline-skel-line"></div>
+        <div class="sk-inline-skel-line"></div>
+        <div class="sk-inline-skel-line is-short"></div>
+      </div>
+      <div class="sk-inline-foot">
+        <span class="sk-inline-label">Claude is writing…</span>
+        <button class="sk-inline-stop">
+          <span class="sk-inline-stop-icon"><i data-lucide="square"></i></span>
+          <span>Stop</span>
+        </button>
+      </div>
     </div>
   </div>
 
