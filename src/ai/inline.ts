@@ -67,13 +67,16 @@ class InlineWidget extends WidgetType {
         const bar = box.createDiv({ cls: "sk-inline-bar" });
         this.makeStop(bar);
       } else {
-        // Pre-first-token: the working pill.
+        // Pre-first-token: a skeleton that previews the shape of the incoming
+        // text. Reads as "almost here" — feels faster than an indeterminate spinner.
         box.addClass("sk-inline-loading");
-        box.createSpan({ cls: "sk-inline-spinner" });
-        const typing = box.createSpan({ cls: "sk-inline-typing" });
-        typing.createSpan({ cls: "sk-inline-caret" });
-        typing.createSpan({ cls: "sk-inline-label", text: "Claude is working…" });
-        this.makeStop(box);
+        const skel = box.createDiv({ cls: "sk-inline-skeleton" });
+        skel.createDiv({ cls: "sk-inline-skel-line" });
+        skel.createDiv({ cls: "sk-inline-skel-line" });
+        skel.createDiv({ cls: "sk-inline-skel-line is-short" });
+        const foot = box.createDiv({ cls: "sk-inline-foot" });
+        foot.createSpan({ cls: "sk-inline-label", text: "Claude is writing…" });
+        this.makeStop(foot);
       }
       return box;
     }

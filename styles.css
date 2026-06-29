@@ -329,27 +329,54 @@
 }
 
 .sk-inline-loading {
-  flex-direction: row;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 11px;
+  gap: 11px;
+  padding: 12px;
+  animation: sk-inline-in 140ms ease-out;
 }
 
-.sk-inline-spinner {
-  flex: none;
-  width: 13px;
-  height: 13px;
-  border-radius: 50%;
-  border: 1.5px solid var(--background-modifier-border);
-  border-top-color: var(--interactive-accent);
-  animation: selection-ai-spin 0.7s linear infinite;
+@keyframes sk-inline-in {
+  from { opacity: 0; transform: translateY(-2px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-.sk-inline-typing {
-  display: inline-flex;
+/* Skeleton: bars that preview the shape of the text being written.
+   A soft accent highlight sweeps across — alive, not an indeterminate spinner. */
+.sk-inline-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.sk-inline-skel-line {
+  height: 9px;
+  border-radius: 4px;
+  background-color: color-mix(in srgb, var(--text-normal) 10%, var(--background-secondary));
+  background-image: linear-gradient(
+    90deg,
+    transparent 18%,
+    color-mix(in srgb, var(--interactive-accent) 30%, transparent) 50%,
+    transparent 82%
+  );
+  background-size: 220% 100%;
+  background-repeat: no-repeat;
+  animation: sk-shimmer 1.15s ease-in-out infinite;
+}
+
+/* Stagger the sweep down the lines for a cascading, intentional feel. */
+.sk-inline-skel-line:nth-child(2) { animation-delay: 0.12s; }
+.sk-inline-skel-line:nth-child(3) { animation-delay: 0.24s; }
+.sk-inline-skel-line.is-short { width: 52%; }
+
+@keyframes sk-shimmer {
+  0%   { background-position: 120% 0; }
+  100% { background-position: -120% 0; }
+}
+
+.sk-inline-foot {
+  display: flex;
   align-items: center;
-  gap: 6px;
-  min-width: 0;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .sk-inline-caret {
@@ -448,13 +475,20 @@
   .selection-toolbar-btn {
     transition-duration: 0ms;
   }
-  .selection-ai-spinner,
-  .sk-inline-spinner {
+  .selection-ai-spinner {
     animation-duration: 0ms;
   }
   .selection-ai-caret,
   .sk-inline-caret {
     animation: none;
+  }
+  .sk-inline-loading {
+    animation: none;
+  }
+  /* Keep the skeleton bars visible, just hold them still. */
+  .sk-inline-skel-line {
+    animation: none;
+    background-image: none;
   }
   .selection-ai-working-label {
     animation: none;
