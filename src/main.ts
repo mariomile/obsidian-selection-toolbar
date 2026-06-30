@@ -66,7 +66,7 @@ export default class SelectionToolbarPlugin extends Plugin {
     // The detector forwards raw events; we debounce here so the delay is live.
     // inlineExtension renders the in-editor AI loading/diff decorations.
     this.registerEditorExtension([
-      inlineExtension(this.app, this),
+      inlineExtension(),
       selectionToolbarExtension((ev) => this.debouncedSelection(ev)),
     ]);
 
@@ -223,15 +223,7 @@ export default class SelectionToolbarPlugin extends Plugin {
     };
 
     view.dispatch({
-      effects: setInline.of({
-        from,
-        to,
-        original,
-        suggestion: "",
-        status: "loading",
-        view: cfg.showDiff ? "diff" : "preview",
-        cb,
-      }),
+      effects: setInline.of({ from, to, original, suggestion: "", status: "loading", cb }),
     });
 
     let acc = "";
