@@ -8,9 +8,11 @@ The toolbar is themed entirely via Obsidian's CSS variables, so it matches your 
 
 ![Multi-row toolbar layout](docs/toolbar-grid.png)
 
-![AI working — animated loader while Claude runs](docs/ai-working.png)
+![AI actions — pick an action or type a prompt](docs/ai-panel.png)
 
-![AI actions panel with a before/after diff preview](docs/ai-panel.png)
+![AI working — skeleton preview while Claude writes](docs/ai-working.png)
+
+![Inline review — word-level diff with Accept / Retry / Discard](docs/ai-inline.png)
 
 ## Features
 
@@ -19,6 +21,18 @@ The toolbar is themed entirely via Obsidian's CSS variables, so it matches your 
 - **Insert**: link, internal `[[link]]`, clear formatting.
 - **AI text actions** (✨): Improve, Fix grammar, Shorten, Expand, Change tone, Translate, and a free-form custom prompt — streamed from Claude.
 - Configurable: enable/disable individual buttons, show delay, minimum selection length.
+
+## How it works
+
+**Formatting.** Select text → the toolbar floats above it → click a command. Wrap commands (bold, italic, …) toggle: click once to apply, again to remove. Block commands (headings, lists, quote, …) are mutually exclusive on a line. The toolbar is anchored to the selection with flip/shift, so it stays on-screen near the edges and follows you as you scroll.
+
+**AI editing (✨).** Select text → click ✨ → a small panel anchors to the selection. Pick a preset (Improve, Fix grammar, Shorten, …) or type a free-form instruction and press Enter. The panel closes and the edit happens **inline, right in the note** (Notion-style):
+
+1. A **skeleton** previews where the text is about to land while Claude starts (no spinner — it reads as "almost here").
+2. The result **streams in live**, token by token, with a **Stop** button.
+3. When it's done you get a **word-level diff** (red = removed, green = added) with **Accept** / **Retry** / **Discard**. Accept replaces the selection; Discard leaves it untouched. If the suggestion is identical to your selection, it says *"No changes suggested"* instead of showing an empty diff.
+
+Nothing is written to your note until you press Accept. The whole flow is themed with your vault's CSS variables.
 
 ## Installation
 
@@ -46,7 +60,7 @@ AI actions run through your **local [Claude Code](https://www.anthropic.com/clau
 - **No API key**: the plugin spawns `claude -p` and reuses your Claude Code login. Nothing is stored in `data.json` except your UI preferences.
 - **Network use**: when you run an AI action, the **selected text** and your prompt are sent to Anthropic *through Claude Code* (which makes the request). The plugin itself opens no other network connections and collects no telemetry.
 - **CLI path**: auto-detected via a login shell. If your `claude` lives somewhere unusual (e.g. under `nvm`), set the absolute path in settings (`which claude`).
-- **Output modes**: *Preview* (review, then Accept/Discard — the default) or *Direct* (stream straight into the editor; `Cmd/Ctrl+Z` to undo).
+- **Output modes**: *Preview* (the default — the edit appears inline in the note with a word-level diff and Accept/Discard) or *Direct* (stream straight into the editor, replacing the selection; `Cmd/Ctrl+Z` to undo).
 - **Model**: defaults to Claude Code's configured model; `opus` / `sonnet` / `haiku` selectable in settings.
 - **Note on terms**: using a subscription via Claude Code as a backend for another app is a gray area in Anthropic's usage terms — use for personal workflows and check your plan's terms.
 
@@ -70,7 +84,7 @@ esbuild then copies `main.js`, `manifest.json`, and `styles.css` there on each b
 - **Selection detection** — a CodeMirror 6 `updateListener` editor extension (no polling); per-pane, never fires in reading mode.
 - **Positioning** — `@floating-ui/dom` with `flip`/`shift`, anchored to a virtual element built from `coordsAtPos`.
 - **Commands** — a data-driven registry; transformation logic is shared by kind (wrap-toggle / line-prefix / block / insert).
-- **AI** — `src/ai/`: a typed action catalog, a streaming client that spawns the local `claude -p` CLI and parses its `stream-json` output (`content_block_delta` / `text_delta`), and a floating panel. No SDK is bundled.
+- **AI** — `src/ai/`: a typed action catalog, a streaming client that spawns the local `claude -p` CLI and parses its `stream-json` output (`content_block_delta` / `text_delta`), a floating picker panel, and an inline editor — results stream **into the note** as a CodeMirror 6 block widget (skeleton → live stream → word-level diff). No SDK is bundled.
 
 ## License
 
