@@ -66,7 +66,7 @@ export default class SelectionToolbarPlugin extends Plugin {
     // The detector forwards raw events; we debounce here so the delay is live.
     // inlineExtension renders the in-editor AI loading/diff decorations.
     this.registerEditorExtension([
-      inlineExtension(),
+      inlineExtension(this.app, this),
       selectionToolbarExtension((ev) => this.debouncedSelection(ev)),
     ]);
 
@@ -84,6 +84,11 @@ export default class SelectionToolbarPlugin extends Plugin {
   private onSelection(ev: SelectionEvent): void {
     // Don't fight the AI panel for screen space.
     if (this.aiPanel.isVisible()) {
+      this.toolbar.hide();
+      return;
+    }
+    // Nor the inline AI edit (a CM6 widget, not the panel) — hide while it's open.
+    if (getInline(ev.view)) {
       this.toolbar.hide();
       return;
     }
@@ -171,6 +176,8 @@ export default class SelectionToolbarPlugin extends Plugin {
     const to = editor.posToOffset(editor.getCursor("to"));
     const original = editor.getSelection();
     if (!original) return;
+    // The inline card replaces the toolbar — never show both at once.
+    this.toolbar.hide();
     this.lastInline = { view, action, input };
     this.streamInline(view, from, to, original, action, input);
   }
@@ -216,7 +223,15 @@ export default class SelectionToolbarPlugin extends Plugin {
     };
 
     view.dispatch({
-      effects: setInline.of({ from, to, original, suggestion: "", status: "loading", cb }),
+      effects: setInline.of({
+        from,
+        to,
+        original,
+        suggestion: "",
+        status: "loading",
+        view: cfg.showDiff ? "diff" : "preview",
+        cb,
+      }),
     });
 
     let acc = "";

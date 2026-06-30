@@ -1,6 +1,6 @@
 import { EditorView, Decoration, WidgetType } from "@codemirror/view";
 import { StateField, StateEffect, type Extension } from "@codemirror/state";
-import { setIcon } from "obsidian";
+import { setIcon, MarkdownRenderer, type App, type Component } from "obsidian";
 import { wordDiff } from "./diff";
 
 export interface InlineCallbacks {
@@ -16,6 +16,8 @@ export interface InlineState {
   original: string;
   suggestion: string;
   status: "loading" | "review";
+  /** Review presentation: rendered markdown ("preview") or source word-diff ("diff"). */
+  view: "preview" | "diff";
   cb: InlineCallbacks;
 }
 
@@ -23,6 +25,8 @@ export interface InlineState {
 export const setInline = StateEffect.define<InlineState | null>();
 /** Update suggestion text + status of the current inline edit. */
 export const patchInline = StateEffect.define<{ suggestion: string; status: "loading" | "review" }>();
+/** Toggle the review presentation without re-running the model. */
+export const setInlineView = StateEffect.define<"preview" | "diff">();
 
 export const inlineField = StateField.define<InlineState | null>({
   create: () => null,
@@ -31,6 +35,8 @@ export const inlineField = StateField.define<InlineState | null>({
       if (e.is(setInline)) value = e.value;
       else if (e.is(patchInline) && value) {
         value = { ...value, suggestion: e.value.suggestion, status: e.value.status };
+      } else if (e.is(setInlineView) && value) {
+        value = { ...value, view: e.value };
       }
     }
     // Keep the anchor valid if the doc changes elsewhere while we're pending.
@@ -46,15 +52,23 @@ export const inlineField = StateField.define<InlineState | null>({
 });
 
 class InlineWidget extends WidgetType {
-  constructor(private s: InlineState) {
+  constructor(
+    private s: InlineState,
+    private app: App,
+    private component: Component
+  ) {
     super();
   }
 
   eq(other: InlineWidget): boolean {
-    return other.s.status === this.s.status && other.s.suggestion === this.s.suggestion;
+    return (
+      other.s.status === this.s.status &&
+      other.s.suggestion === this.s.suggestion &&
+      other.s.view === this.s.view
+    );
   }
 
-  toDOM(): HTMLElement {
+  toDOM(view: EditorView): HTMLElement {
     const box = document.createElement("div");
     box.className = "sk-inline";
 
@@ -81,13 +95,46 @@ class InlineWidget extends WidgetType {
       return box;
     }
 
+    // ---- Review ----
     box.addClass("sk-inline-review");
-    const diff = box.createDiv({ cls: "sk-inline-diff" });
-    for (const seg of wordDiff(this.s.original, this.s.suggestion)) {
-      const cls =
-        seg.type === "del" ? "selection-ai-del" : seg.type === "add" ? "selection-ai-add" : undefined;
-      diff.createSpan(cls ? { cls, text: seg.text } : { text: seg.text });
+    const segs = wordDiff(this.s.original, this.s.suggestion);
+    const changed = segs.some((s) => s.type !== "eq");
+
+    // Header: tab toggle (Preview / Diff) when there's something to compare;
+    // otherwise an explicit "no changes" state so an empty diff never looks broken.
+    const head = box.createDiv({ cls: "sk-inline-head" });
+    if (changed) {
+      const toggle = head.createDiv({ cls: "sk-inline-toggle" });
+      const tab = (id: "preview" | "diff", label: string) => {
+        const t = toggle.createEl("button", {
+          cls: "sk-inline-tab" + (this.s.view === id ? " is-active" : ""),
+          text: label,
+        });
+        t.onclick = (e) => {
+          e.preventDefault();
+          if (this.s.view !== id) view.dispatch({ effects: setInlineView.of(id) });
+        };
+      };
+      tab("preview", "Preview");
+      tab("diff", "Diff");
+    } else {
+      head.createSpan({ cls: "sk-inline-nochange", text: "No changes suggested" });
     }
+
+    // Body: rendered markdown by default (reads naturally), or the source diff.
+    if (changed && this.s.view === "diff") {
+      const diff = box.createDiv({ cls: "sk-inline-diff" });
+      for (const seg of segs) {
+        const cls =
+          seg.type === "del" ? "selection-ai-del" : seg.type === "add" ? "selection-ai-add" : undefined;
+        diff.createSpan(cls ? { cls, text: seg.text } : { text: seg.text });
+      }
+    } else {
+      const rendered = box.createDiv({ cls: "sk-inline-rendered" });
+      void MarkdownRenderer.render(this.app, this.s.suggestion, rendered, "", this.component);
+    }
+
+    // Footer.
     const bar = box.createDiv({ cls: "sk-inline-bar" });
     const btn = (label: string, cta: boolean, fn: () => void) => {
       const b = bar.createEl("button", {
@@ -99,7 +146,7 @@ class InlineWidget extends WidgetType {
         fn();
       };
     };
-    btn("Accept", true, () => this.s.cb.onAccept());
+    if (changed) btn("Accept", true, () => this.s.cb.onAccept());
     btn("Retry", false, () => this.s.cb.onRetry());
     btn("Discard", false, () => this.s.cb.onDiscard());
     return box;
@@ -121,17 +168,19 @@ class InlineWidget extends WidgetType {
   }
 }
 
-const inlineDecorations = EditorView.decorations.compute([inlineField], (state) => {
-  const s = state.field(inlineField);
-  if (!s) return Decoration.none;
-  const anchor = Math.min(s.to, state.doc.length);
-  const lineEnd = state.doc.lineAt(anchor).to;
-  const widget = Decoration.widget({ widget: new InlineWidget(s), side: 1, block: true });
-  return Decoration.set([widget.range(lineEnd)]);
-});
+function inlineDecorations(app: App, component: Component) {
+  return EditorView.decorations.compute([inlineField], (state) => {
+    const s = state.field(inlineField);
+    if (!s) return Decoration.none;
+    const anchor = Math.min(s.to, state.doc.length);
+    const lineEnd = state.doc.lineAt(anchor).to;
+    const widget = Decoration.widget({ widget: new InlineWidget(s, app, component), side: 1, block: true });
+    return Decoration.set([widget.range(lineEnd)]);
+  });
+}
 
-export function inlineExtension(): Extension {
-  return [inlineField, inlineDecorations];
+export function inlineExtension(app: App, component: Component): Extension {
+  return [inlineField, inlineDecorations(app, component)];
 }
 
 /** Read the current inline edit from a view (null if none). */
