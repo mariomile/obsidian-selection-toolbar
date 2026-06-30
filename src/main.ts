@@ -166,7 +166,6 @@ export default class SelectionToolbarPlugin extends Plugin {
       model: this.settings.aiModel,
       modelQuick: this.settings.aiModelQuick,
       outputMode: this.settings.aiOutputMode,
-      showDiff: this.settings.aiShowDiff,
     };
   }
 

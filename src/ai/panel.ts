@@ -3,7 +3,6 @@ import type { EditorView } from "@codemirror/view";
 import { computePosition, autoUpdate, offset, flip, shift } from "@floating-ui/dom";
 import { buildUserMessage, type AIAction } from "./types";
 import { streamCompletion, describeError, isAbort, type ResolvedCli } from "./client";
-import { wordDiff, DIFF_CHAR_CAP } from "./diff";
 import { selectionRect } from "../utils/editor";
 
 export interface AIConfig {
@@ -13,8 +12,6 @@ export interface AIConfig {
   /** Fast model for actions flagged `quick`. */
   modelQuick: string;
   outputMode: "preview" | "direct";
-  /** Show a before/after diff in preview mode. */
-  showDiff: boolean;
 }
 
 export interface AIPanelDeps {
@@ -32,7 +29,14 @@ export interface OpenOptions {
   repeat?: boolean;
 }
 
-/** Floating panel anchored to the selection: pick an action → stream Claude. */
+/**
+ * Floating panel anchored to the selection: pick an action or type a prompt.
+ *
+ * In **preview** mode (the default) it delegates to the inline editor and closes
+ * immediately — the result streams into the note with a diff (see `inline.ts`).
+ * In **direct** mode it streams Claude's output straight into the editor,
+ * replacing the selection.
+ */
 export class AIPanel extends Component {
   private el: HTMLElement;
   private actionsEl!: HTMLElement;
@@ -46,7 +50,6 @@ export class AIPanel extends Component {
   private from: EditorPosition | null = null;
   private to: EditorPosition | null = null;
   private original = "";
-  private result = "";
   private directEnd: EditorPosition | null = null;
 
   private controller: AbortController | null = null;
@@ -56,14 +59,6 @@ export class AIPanel extends Component {
   private selectedAction: AIAction | null = null;
   private lastAction: AIAction | null = null;
   private lastInput = "";
-
-  // Working-state UI
-  private firstDelta = false;
-  private textEl: HTMLElement | null = null;
-
-  // Diff
-  private canDiff = false;
-  private showingDiff = false;
 
   constructor(private deps: AIPanelDeps) {
     super();
@@ -207,22 +202,17 @@ export class AIPanel extends Component {
       return;
     }
 
+    // Direct mode → stream straight into the editor, replacing the selection.
     this.generating = true;
-    this.result = "";
-    this.showingDiff = false;
     this.controller = new AbortController();
-
-    const direct = cfg.outputMode === "direct";
     const model = action.model || (action.quick ? cfg.modelQuick : cfg.model);
 
-    this.startWorking(direct);
+    this.startWorking();
     this.renderFooter([{ label: "Stop", onClick: () => this.cancel() }]);
 
-    if (direct) {
-      // Clear the selection once, then append deltas at a tracked cursor.
-      this.editor.replaceRange("", this.from, this.to);
-      this.directEnd = { ...this.from };
-    }
+    // Clear the selection once, then append deltas at a tracked cursor.
+    this.editor.replaceRange("", this.from, this.to);
+    this.directEnd = { ...this.from };
 
     try {
       await streamCompletion({
@@ -231,11 +221,11 @@ export class AIPanel extends Component {
         system: action.system,
         user: buildUserMessage(action, this.original, input),
         signal: this.controller.signal,
-        onDelta: (delta) => this.onDelta(delta, direct),
+        onDelta: (delta) => this.onDelta(delta),
       });
     } catch (e) {
       this.generating = false;
-      if (direct) this.restoreDirect();
+      this.restoreDirect();
       if (isAbort(e)) {
         this.setStatus("Stopped.");
       } else {
@@ -250,100 +240,24 @@ export class AIPanel extends Component {
     }
 
     this.generating = false;
-    if (direct) {
-      this.close();
-      return;
-    }
-    this.setStatus("Done.");
-    this.canDiff =
-      cfg.showDiff &&
-      this.original.trim().length > 0 &&
-      this.result.trim() !== this.original.trim() &&
-      this.original.length + this.result.length <= DIFF_CHAR_CAP;
-    this.showingDiff = this.canDiff;
-    this.renderOutput();
-    this.renderResultFooter();
+    this.close();
   }
 
-  private onDelta(delta: string, direct: boolean): void {
-    this.result += delta;
-    if (direct && this.editor && this.directEnd) {
-      this.editor.replaceRange(delta, this.directEnd);
-      const offsetEnd = this.editor.posToOffset(this.directEnd) + delta.length;
-      this.directEnd = this.editor.offsetToPos(offsetEnd);
-      return;
-    }
-    if (!this.firstDelta) {
-      // First token arrived: drop the working spinner, start showing text.
-      this.firstDelta = true;
-      this.outputEl.empty();
-      this.outputEl.removeClass("is-empty");
-      this.textEl = this.outputEl.createSpan({ cls: "selection-ai-text" });
-      this.outputEl.createSpan({ cls: "selection-ai-caret" });
-      this.setStatus("Streaming…");
-    }
-    this.textEl?.setText(this.result);
-    this.outputEl.scrollTop = this.outputEl.scrollHeight;
+  private onDelta(delta: string): void {
+    if (!this.editor || !this.directEnd) return;
+    this.editor.replaceRange(delta, this.directEnd);
+    const offsetEnd = this.editor.posToOffset(this.directEnd) + delta.length;
+    this.directEnd = this.editor.offsetToPos(offsetEnd);
   }
 
   /** Animated "working" indicator covering the cold-start dead-air. */
-  private startWorking(direct: boolean): void {
-    this.firstDelta = false;
-    this.textEl = null;
+  private startWorking(): void {
     this.outputEl.empty();
     this.outputEl.removeClass("is-empty");
     const w = this.outputEl.createDiv({ cls: "selection-ai-working" });
     w.createSpan({ cls: "selection-ai-spinner" });
-    w.createSpan({
-      cls: "selection-ai-working-label",
-      text: direct ? "Writing into the editor…" : "Claude is working…",
-    });
+    w.createSpan({ cls: "selection-ai-working-label", text: "Writing into the editor…" });
     this.setStatus("");
-  }
-
-  private renderOutput(): void {
-    this.outputEl.empty();
-    this.outputEl.removeClass("is-empty");
-    if (this.showingDiff) {
-      for (const seg of wordDiff(this.original, this.result)) {
-        const cls =
-          seg.type === "del"
-            ? "selection-ai-del"
-            : seg.type === "add"
-            ? "selection-ai-add"
-            : undefined;
-        this.outputEl.createSpan(cls ? { cls, text: seg.text } : { text: seg.text });
-      }
-    } else {
-      this.outputEl.setText(this.result);
-    }
-  }
-
-  private renderResultFooter(): void {
-    const buttons: FooterButton[] = [{ label: "Replace", cta: true, onClick: () => this.accept() }];
-    if (this.canDiff) {
-      buttons.push({
-        label: this.showingDiff ? "Show result" : "Show diff",
-        onClick: () => {
-          this.showingDiff = !this.showingDiff;
-          this.renderOutput();
-          this.renderResultFooter();
-        },
-      });
-    }
-    buttons.push({ label: "Insert below", onClick: () => this.insertBelow() });
-    buttons.push({ label: "Retry", onClick: () => this.retry() });
-    buttons.push({ label: "Discard", onClick: () => this.close() });
-    this.renderFooter(buttons);
-  }
-
-  /** Non-destructive: keep the selection, add the result on a new line after it. */
-  private insertBelow(): void {
-    if (this.editor && this.to && this.result) {
-      const eol = { line: this.to.line, ch: this.editor.getLine(this.to.line).length };
-      this.editor.replaceRange(`\n\n${this.result}`, eol, eol);
-    }
-    this.close();
   }
 
   /** Restore the original selection text after a failed/cancelled direct run. */
@@ -355,13 +269,6 @@ export class AIPanel extends Component {
       this.editor.offsetToPos(this.editor.posToOffset(this.from) + this.original.length)
     );
     this.directEnd = null;
-  }
-
-  private accept(): void {
-    if (this.editor && this.from && this.to && this.result) {
-      this.editor.replaceRange(this.result, this.from, this.to);
-    }
-    this.close();
   }
 
   private retry(): void {
@@ -411,14 +318,9 @@ export class AIPanel extends Component {
     this.from = null;
     this.to = null;
     this.original = "";
-    this.result = "";
     this.directEnd = null;
     this.generating = false;
     this.selectedAction = null;
-    this.firstDelta = false;
-    this.textEl = null;
-    this.canDiff = false;
-    this.showingDiff = false;
     this.promptInput.value = "";
     this.promptInput.placeholder = "Ask Claude, or pick an action…";
     this.outputEl.addClass("is-empty");

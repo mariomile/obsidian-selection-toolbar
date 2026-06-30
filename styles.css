@@ -286,20 +286,6 @@
   to { background-position: -200% 0; }
 }
 
-.selection-ai-caret {
-  display: inline-block;
-  width: 2px;
-  height: 1em;
-  margin-left: 1px;
-  vertical-align: text-bottom;
-  background: var(--interactive-accent);
-  animation: selection-ai-blink 1s step-end infinite;
-}
-
-@keyframes selection-ai-blink {
-  50% { opacity: 0; }
-}
-
 /* ---------- AI diff ---------- */
 .selection-ai-del {
   color: var(--color-red);
@@ -484,7 +470,6 @@
   .selection-ai-spinner {
     animation-duration: 0ms;
   }
-  .selection-ai-caret,
   .sk-inline-caret {
     animation: none;
   }

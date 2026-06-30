@@ -26,8 +26,6 @@ export interface SelectionToolbarSettings {
   /** Fast model for "quick" actions (fix grammar, shorten). */
   aiModelQuick: string;
   aiOutputMode: AIOutputMode;
-  /** Show a before/after diff in preview mode. */
-  aiShowDiff: boolean;
   /** User-defined actions, shown alongside the built-in presets. */
   customActions: CustomAction[];
 }
@@ -45,7 +43,6 @@ export const DEFAULT_SETTINGS: SelectionToolbarSettings = {
   aiModel: "default",
   aiModelQuick: "haiku",
   aiOutputMode: "preview",
-  aiShowDiff: true,
   customActions: [],
 };
 
@@ -221,16 +218,6 @@ export class SelectionToolbarSettingTab extends PluginSettingTab {
               this.plugin.settings.aiOutputMode = v as AIOutputMode;
               await this.plugin.saveSettings();
             })
-        );
-
-      new Setting(containerEl)
-        .setName("Show diff in preview")
-        .setDesc("In preview mode, highlight what changed (red = removed, green = added) before you Replace.")
-        .addToggle((tg) =>
-          tg.setValue(this.plugin.settings.aiShowDiff).onChange(async (v) => {
-            this.plugin.settings.aiShowDiff = v;
-            await this.plugin.saveSettings();
-          })
         );
 
       const testSetting = new Setting(containerEl)
