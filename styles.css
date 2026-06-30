@@ -446,6 +446,66 @@
   margin-left: 1px;
 }
 
+/* Review header: a Preview/Diff segmented toggle, or a "no changes" note. */
+.sk-inline-head {
+  display: flex;
+  align-items: center;
+}
+
+.sk-inline-toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--background-modifier-hover);
+  border-radius: var(--radius-s);
+}
+
+.sk-inline-tab {
+  font-size: var(--font-ui-smaller);
+  line-height: 1.4;
+  padding: 2px 11px;
+  border: none;
+  border-radius: calc(var(--radius-s) - 1px);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.sk-inline-tab:hover {
+  color: var(--text-normal);
+}
+
+.sk-inline-tab.is-active {
+  background: var(--background-primary);
+  color: var(--text-normal);
+  box-shadow: var(--shadow-s);
+}
+
+.sk-inline-nochange {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+/* Rendered-markdown preview of the suggestion — bold/italic/headings show as
+   formatted text, not raw `**` source. */
+.sk-inline-rendered {
+  line-height: 1.5;
+  color: var(--text-normal);
+}
+
+.sk-inline-rendered > :first-child {
+  margin-top: 0;
+}
+
+.sk-inline-rendered > :last-child {
+  margin-bottom: 0;
+}
+
+.sk-inline-rendered p {
+  margin: 0 0 0.4em;
+}
+
 .sk-inline-bar {
   display: flex;
   flex-wrap: wrap;
