@@ -487,3 +487,10 @@
     -webkit-text-fill-color: var(--text-muted);
   }
 }
+
+/* No focus ring on buttons — Mario's preference (suite-wide, keyboard included). */
+:is([class^="selection-"], [class*=" selection-"]) :is(button, .clickable-icon, [role="button"]):focus,
+:is([class^="selection-"], [class*=" selection-"]) :is(button, .clickable-icon, [role="button"]):focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
