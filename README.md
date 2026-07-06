@@ -67,14 +67,14 @@ AI actions run through your **local [Claude Code](https://www.anthropic.com/clau
 ## Development
 
 ```bash
-npm install
-npm run dev      # esbuild watch — rebuilds on every save
-npm run build    # tsc typecheck + minified production build
+pnpm install
+pnpm dev      # esbuild watch — rebuilds on every save
+pnpm build    # tsc typecheck + minified production build
 ```
 
 By default the build outputs `main.js` to the project root. To auto-deploy into your vault during dev, point the build at your plugin folder with either:
 
-- an env var: `OBSIDIAN_PLUGIN_DIR="/path/to/Vault/.obsidian/plugins/selection-toolbar" npm run dev`, or
+- an env var: `OBSIDIAN_PLUGIN_DIR="/path/to/Vault/.obsidian/plugins/selection-toolbar" pnpm dev`, or
 - a gitignored `.obsidian-plugin-dir` file in the project root containing that absolute path.
 
 esbuild then copies `main.js`, `manifest.json`, and `styles.css` there on each build.

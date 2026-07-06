@@ -488,9 +488,9 @@
   }
 }
 
-/* No focus ring on buttons — Mario's preference (suite-wide, keyboard included). */
-:is([class^="selection-"], [class*=" selection-"]) :is(button, .clickable-icon, [role="button"]):focus,
+/* Preserve a visible keyboard focus indicator. */
 :is([class^="selection-"], [class*=" selection-"]) :is(button, .clickable-icon, [role="button"]):focus-visible {
-  outline: none !important;
+  outline: 2px solid var(--interactive-accent) !important;
+  outline-offset: 2px;
   box-shadow: none !important;
 }
