@@ -34,6 +34,10 @@ The toolbar is themed entirely via Obsidian's CSS variables, so it matches your 
 
 Nothing is written to your note until you press Accept. The whole flow is themed with your vault's CSS variables.
 
+## Mobile
+
+**Unsupported** — `isDesktopOnly: true` in `manifest.json`; `src/ai/client.ts` imports Node's `child_process`, `os`, `fs`, and `path` to spawn the local `claude` CLI, which isn't available on mobile.
+
 ## Installation
 
 **Requirements:** Obsidian 1.4+ (desktop), and [Claude Code](https://www.anthropic.com/claude-code) installed and signed in (run `claude` once in a terminal). AI actions use your Claude subscription via the local CLI — no API key.
