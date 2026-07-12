@@ -4,6 +4,7 @@
     "module": "ESNext",
     "target": "ES2021",
     "moduleResolution": "node",
+    "allowImportingTsExtensions": true,
     "allowJs": true,
     "noImplicitAny": true,
     "isolatedModules": true,

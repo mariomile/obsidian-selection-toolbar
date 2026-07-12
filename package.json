@@ -1,13 +1,14 @@
 {
   "name": "obsidian-selection-toolbar",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "packageManager": "pnpm@10.17.1",
   "description": "Floating selection formatting toolbar with Claude AI text actions for Obsidian",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "pnpm typecheck && node esbuild.config.mjs production",
-    "typecheck": "tsc --noEmit --skipLibCheck"
+    "typecheck": "tsc --noEmit --skipLibCheck",
+    "test": "node --experimental-strip-types --test \"src/**/*.test.ts\""
   },
   "keywords": [
     "obsidian",
