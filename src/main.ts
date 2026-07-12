@@ -285,37 +285,34 @@ export default class SelectionToolbarPlugin extends Plugin {
   }
 
   /**
-   * Optional "Annotate" command that hands the current selection to the sibling
-   * AIditor plugin via its Obsidian command. Not an AI/format action — it never
-   * mutates the selection, only triggers AIditor to attach a margin annotation.
-   * Bound to `this.app` (a static COMMANDS entry can't reach app.commands).
-   * Only present when AIditor's command is registered.
+   * When the sibling AIditor plugin is installed, the toolbar's existing
+   * "Comment" button attaches a proper margin annotation to the selection
+   * (via AIditor's `aiditor:annotate-selection` command) instead of wrapping
+   * it in a raw `%% %%` markdown comment. This keeps ONE comment affordance —
+   * no separate "Annotate" button — and never mutates the selected text.
+   * Falls back to the built-in comment behavior when AIditor isn't present.
+   * Bound here (not in the static COMMANDS catalog) because it needs app.commands.
    */
-  private annotateCommand(): ToolbarCommand | null {
-    const commands = (this.app as unknown as {
+  private withAiditorComment(commands: ToolbarCommand[]): ToolbarCommand[] {
+    const api = (this.app as unknown as {
       commands: {
         findCommand: (id: string) => unknown;
         executeCommandById: (id: string) => boolean;
       };
     }).commands;
-    if (!commands.findCommand("aiditor:annotate-selection")) return null;
-    return {
-      id: "annotate",
-      label: "Annotate",
-      icon: "message-square-plus",
-      group: "insert",
-      apply: () => {
-        commands.executeCommandById("aiditor:annotate-selection");
-      },
-    };
+    if (!api.findCommand("aiditor:annotate-selection")) return commands;
+    return commands.map((c) =>
+      c.id === "comment"
+        ? { ...c, apply: () => void api.executeCommandById("aiditor:annotate-selection") }
+        : c,
+    );
   }
 
   private buildToolbar(): void {
     const aiReady = this.settings.aiEnabled;
-    const commands = commandsFor(this.settings.enabledCommandIds);
-    const annotate = this.annotateCommand();
+    const commands = this.withAiditorComment(commandsFor(this.settings.enabledCommandIds));
     this.toolbar = new SelectionToolbar({
-      commands: annotate ? [...commands, annotate] : commands,
+      commands,
       resolveEditor: (view) => this.resolveEditor(view),
       onAI: aiReady ? (view, editor) => this.aiPanel.open(view, editor) : undefined,
       maxButtons: this.settings.toolbarMaxButtons,
