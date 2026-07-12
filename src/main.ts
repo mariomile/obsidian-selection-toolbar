@@ -13,8 +13,10 @@ import {
 import { selectionToolbarExtension, type SelectionEvent } from "./selection-extension";
 import { inlineExtension, setInline, patchInline, getInline, type InlineCallbacks } from "./ai/inline";
 import { commandsFor, COMMANDS } from "./commands/registry";
+import type { ToolbarCommand } from "./commands/types";
 import { AI_ACTIONS, customToAction } from "./ai/actions";
 import { buildUserMessage, type AIAction } from "./ai/types";
+import { selectionMatchesOriginal } from "./ai/guard";
 import {
   type SelectionToolbarSettings,
   DEFAULT_SETTINGS,
@@ -29,6 +31,8 @@ export default class SelectionToolbarPlugin extends Plugin {
   private cli: ResolvedCli = { bin: "claude", pathEnv: process.env.PATH ?? "" };
   private debouncedSelection!: Debouncer<[SelectionEvent], void>;
   private inlineAbort: AbortController | null = null;
+  private inlineView: EditorView | null = null;
+  private inlineRunId = 0;
   private lastInline: { view: EditorView; action: AIAction; input: string } | null = null;
 
   async onload(): Promise<void> {
@@ -190,8 +194,13 @@ export default class SelectionToolbarPlugin extends Plugin {
     input: string
   ): void {
     this.inlineAbort?.abort();
+    if (this.inlineView && this.inlineView !== view) {
+      this.inlineView.dispatch({ effects: setInline.of(null) });
+    }
+    const runId = ++this.inlineRunId;
     const controller = new AbortController();
     this.inlineAbort = controller;
+    this.inlineView = view;
     const cfg = this.aiConfig();
     const model = action.model || (action.quick ? cfg.modelQuick : cfg.model);
     const clear = () => view.dispatch({ effects: setInline.of(null) });
@@ -200,17 +209,25 @@ export default class SelectionToolbarPlugin extends Plugin {
       onAccept: () => {
         const s = getInline(view);
         if (s) {
+          const current = view.state.doc.sliceString(s.from, s.to);
+          if (!selectionMatchesOriginal(current, s.original)) {
+            new Notice("Selection Sidekick: the selected text changed — review or retry the suggestion.");
+            return;
+          }
           view.dispatch({
             changes: { from: s.from, to: s.to, insert: s.suggestion },
             effects: setInline.of(null),
           });
         }
         this.inlineAbort = null;
+        this.inlineView = null;
       },
       onDiscard: () => {
+        if (runId === this.inlineRunId) this.inlineRunId += 1;
         controller.abort();
         clear();
         this.inlineAbort = null;
+        this.inlineView = null;
       },
       onRetry: () => {
         const li = this.lastInline;
@@ -234,6 +251,7 @@ export default class SelectionToolbarPlugin extends Plugin {
       user: buildUserMessage(action, original, input),
       signal: controller.signal,
       onDelta: (d) => {
+        if (runId !== this.inlineRunId) return;
         acc += d;
         // Show the result appearing live (throttled to limit re-renders).
         const now = Date.now();
@@ -244,24 +262,60 @@ export default class SelectionToolbarPlugin extends Plugin {
       },
     })
       .then(() => {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted || runId !== this.inlineRunId) return;
         view.dispatch({ effects: patchInline.of({ suggestion: acc.trim(), status: "review" }) });
+        this.inlineAbort = null;
       })
       .catch((e) => {
+        if (runId !== this.inlineRunId) return;
         if (isAbort(e)) {
           if (acc.trim()) view.dispatch({ effects: patchInline.of({ suggestion: acc.trim(), status: "review" }) });
-          else clear();
+          else {
+            clear();
+            this.inlineView = null;
+          }
+          this.inlineAbort = null;
           return;
         }
         clear();
+        this.inlineAbort = null;
+        this.inlineView = null;
         new Notice(describeError(e));
       });
   }
 
+  /**
+   * Optional "Annotate" command that hands the current selection to the sibling
+   * AIditor plugin via its Obsidian command. Not an AI/format action — it never
+   * mutates the selection, only triggers AIditor to attach a margin annotation.
+   * Bound to `this.app` (a static COMMANDS entry can't reach app.commands).
+   * Only present when AIditor's command is registered.
+   */
+  private annotateCommand(): ToolbarCommand | null {
+    const commands = (this.app as unknown as {
+      commands: {
+        findCommand: (id: string) => unknown;
+        executeCommandById: (id: string) => boolean;
+      };
+    }).commands;
+    if (!commands.findCommand("aiditor:annotate-selection")) return null;
+    return {
+      id: "annotate",
+      label: "Annotate",
+      icon: "message-square-plus",
+      group: "insert",
+      apply: () => {
+        commands.executeCommandById("aiditor:annotate-selection");
+      },
+    };
+  }
+
   private buildToolbar(): void {
     const aiReady = this.settings.aiEnabled;
+    const commands = commandsFor(this.settings.enabledCommandIds);
+    const annotate = this.annotateCommand();
     this.toolbar = new SelectionToolbar({
-      commands: commandsFor(this.settings.enabledCommandIds),
+      commands: annotate ? [...commands, annotate] : commands,
       resolveEditor: (view) => this.resolveEditor(view),
       onAI: aiReady ? (view, editor) => this.aiPanel.open(view, editor) : undefined,
       maxButtons: this.settings.toolbarMaxButtons,
@@ -300,7 +354,10 @@ export default class SelectionToolbarPlugin extends Plugin {
   }
 
   onunload(): void {
-    // Toolbar + AI panel (child Components), DOM events, and the editor
-    // extension are all cleaned up automatically by Obsidian.
+    this.inlineRunId += 1;
+    this.inlineAbort?.abort();
+    this.inlineAbort = null;
+    this.inlineView?.dispatch({ effects: setInline.of(null) });
+    this.inlineView = null;
   }
 }
