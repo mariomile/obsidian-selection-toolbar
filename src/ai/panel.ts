@@ -161,6 +161,13 @@ export class AIPanel extends Component {
 
   private selectAction(action: AIAction): void {
     if (this.generating) return;
+    // Command actions (e.g. AIditor "Annotate") side-effect on the live
+    // selection and bypass the LLM pipeline entirely — run and close.
+    if (action.run) {
+      action.run();
+      this.close();
+      return;
+    }
     this.selectedAction = action;
     if (action.needsInput) {
       this.promptInput.placeholder = action.inputPlaceholder ?? "…";

@@ -18,6 +18,13 @@ export interface AIAction {
   model?: string;
   /** Marks user-defined actions (vs built-in presets). */
   custom?: boolean;
+  /**
+   * Side-effect command action (e.g. the sibling AIditor "Annotate"). When set,
+   * the panel runs this instead of the LLM pipeline — no system prompt, no
+   * streaming, no diff; `system`/`buildUser` are ignored. Used for cross-plugin
+   * command hand-offs that act on the live editor selection.
+   */
+  run?: () => void;
 }
 
 /** A user-defined action, persisted in settings. */

@@ -113,7 +113,43 @@ export default class SelectionToolbarPlugin extends Plugin {
 
   /** Built-in presets + user-defined custom actions (read live from settings). */
   private aiActions(): AIAction[] {
-    return [...AI_ACTIONS, ...this.settings.customActions.map(customToAction)];
+    const actions = [...AI_ACTIONS, ...this.settings.customActions.map(customToAction)];
+    return this.withAiditorAnnotate(actions);
+  }
+
+  /** Obsidian's (untyped) command registry. */
+  private commands(): {
+    findCommand: (id: string) => unknown;
+    executeCommandById: (id: string) => boolean;
+  } {
+    return (this.app as unknown as {
+      commands: {
+        findCommand: (id: string) => unknown;
+        executeCommandById: (id: string) => boolean;
+      };
+    }).commands;
+  }
+
+  /**
+   * When the sibling AIditor plugin is installed, expose its "Annotate" command
+   * as a panel action too — not only via the toolbar's Comment button. Selecting
+   * it hands off to `aiditor:annotate-selection`, which reads the *live* editor
+   * selection, so it works even while the panel holds DOM focus. It side-effects
+   * (bypasses the LLM pipeline) via `run`. Absent AIditor, nothing is added.
+   */
+  private withAiditorAnnotate(actions: AIAction[]): AIAction[] {
+    const api = this.commands();
+    if (!api.findCommand("aiditor:annotate-selection")) return actions;
+    return [
+      ...actions,
+      {
+        id: "aiditor-annotate",
+        label: "Annotate",
+        icon: "message-square-plus",
+        system: "",
+        run: () => void api.executeCommandById("aiditor:annotate-selection"),
+      },
+    ];
   }
 
   /** Registered once at load (NOT in buildToolbar, which re-runs on save). */
@@ -294,12 +330,7 @@ export default class SelectionToolbarPlugin extends Plugin {
    * Bound here (not in the static COMMANDS catalog) because it needs app.commands.
    */
   private withAiditorComment(commands: ToolbarCommand[]): ToolbarCommand[] {
-    const api = (this.app as unknown as {
-      commands: {
-        findCommand: (id: string) => unknown;
-        executeCommandById: (id: string) => boolean;
-      };
-    }).commands;
+    const api = this.commands();
     if (!api.findCommand("aiditor:annotate-selection")) return commands;
     return commands.map((c) =>
       c.id === "comment"
