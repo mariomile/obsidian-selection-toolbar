@@ -4,6 +4,8 @@ A floating formatting toolbar for [Obsidian](https://obsidian.md) that appears w
 
 The toolbar is themed entirely via Obsidian's CSS variables, so it matches your active theme (light, dark, or any community theme) automatically.
 
+Part of the marioverse Obsidian plugin suite.
+
 ![Floating formatting toolbar over a text selection](docs/toolbar.png)
 
 ![Multi-row toolbar layout](docs/toolbar-grid.png)
