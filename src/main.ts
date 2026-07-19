@@ -29,6 +29,7 @@ export default class SelectionToolbarPlugin extends Plugin {
   private aiPanel!: AIPanel;
   private mouseDown = false;
   private cli: ResolvedCli = { bin: "claude", pathEnv: process.env.PATH ?? "" };
+  private cliRefresh: Promise<void> | null = null;
   private debouncedSelection!: Debouncer<[SelectionEvent], void>;
   private inlineAbort: AbortController | null = null;
   private inlineView: EditorView | null = null;
@@ -37,7 +38,12 @@ export default class SelectionToolbarPlugin extends Plugin {
 
   async onload(): Promise<void> {
     await this.loadSettings();
-    await this.refreshCli();
+    // CLI discovery can spawn a login shell on macOS. Keep plugin startup
+    // independent from that work; the safe fallback above remains usable while
+    // discovery finishes in the background.
+    void this.refreshCli().catch((error: unknown) => {
+      console.warn("Selection Sidekick: CLI discovery failed", error);
+    });
 
     // AI panel is created once; it reads live config + actions via callbacks.
     this.aiPanel = new AIPanel({
@@ -108,7 +114,18 @@ export default class SelectionToolbarPlugin extends Plugin {
   }
 
   private async refreshCli(): Promise<void> {
-    this.cli = await resolveCli(this.settings.claudeCliPath);
+    if (this.cliRefresh) return this.cliRefresh;
+
+    const refresh = resolveCli(this.settings.claudeCliPath).then((cli) => {
+      this.cli = cli;
+    });
+    this.cliRefresh = refresh;
+    void refresh.then(() => {
+      if (this.cliRefresh === refresh) this.cliRefresh = null;
+    }, () => {
+      if (this.cliRefresh === refresh) this.cliRefresh = null;
+    });
+    return refresh;
   }
 
   /** Built-in presets + user-defined custom actions (read live from settings). */
