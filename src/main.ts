@@ -35,6 +35,7 @@ export default class SelectionToolbarPlugin extends Plugin {
   private inlineView: EditorView | null = null;
   private inlineRunId = 0;
   private lastInline: { view: EditorView; action: AIAction; input: string } | null = null;
+  private lastSelection: SelectionEvent | null = null;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -75,11 +76,20 @@ export default class SelectionToolbarPlugin extends Plugin {
 
     // Switching notes/panes doesn't fire a CM6 selection update on the leaf
     // being left (its view is detached, not destroyed) — without this the
-    // toolbar/panel keep floating over the newly active note.
+    // toolbar/panel keep floating over the newly active note, and CM6 keeps
+    // the leaf's own selection intact so it'd resurface (still highlighted,
+    // toolbar and all) whenever that note becomes active again. Deselect it
+    // on the way out so a note never shows a selection the user didn't just make.
     this.registerEvent(
       this.app.workspace.on("active-leaf-change", () => {
         if (this.aiPanel.isVisible()) this.aiPanel.close();
         this.toolbar.hide();
+        const last = this.lastSelection;
+        this.lastSelection = null;
+        if (last?.hasSelection) {
+          const head = last.view.state.selection.main.head;
+          last.view.dispatch({ selection: { anchor: head } });
+        }
       })
     );
 
@@ -87,7 +97,10 @@ export default class SelectionToolbarPlugin extends Plugin {
     // inlineExtension renders the in-editor AI loading/diff decorations.
     this.registerEditorExtension([
       inlineExtension(),
-      selectionToolbarExtension((ev) => this.debouncedSelection(ev)),
+      selectionToolbarExtension((ev) => {
+        this.lastSelection = ev;
+        this.debouncedSelection(ev);
+      }),
     ]);
 
     this.addSettingTab(new SelectionToolbarSettingTab(this.app, this));
