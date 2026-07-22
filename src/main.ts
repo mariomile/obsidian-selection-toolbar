@@ -73,6 +73,16 @@ export default class SelectionToolbarPlugin extends Plugin {
       else if (this.toolbar.isVisible()) this.toolbar.hide();
     });
 
+    // Switching notes/panes doesn't fire a CM6 selection update on the leaf
+    // being left (its view is detached, not destroyed) — without this the
+    // toolbar/panel keep floating over the newly active note.
+    this.registerEvent(
+      this.app.workspace.on("active-leaf-change", () => {
+        if (this.aiPanel.isVisible()) this.aiPanel.close();
+        this.toolbar.hide();
+      })
+    );
+
     // The detector forwards raw events; we debounce here so the delay is live.
     // inlineExtension renders the in-editor AI loading/diff decorations.
     this.registerEditorExtension([
