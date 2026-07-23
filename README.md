@@ -92,6 +92,10 @@ esbuild then copies `main.js`, `manifest.json`, and `styles.css` there on each b
 - **Commands** — a data-driven registry; transformation logic is shared by kind (wrap-toggle / line-prefix / block / insert).
 - **AI** — `src/ai/`: a typed action catalog, a streaming client that spawns the local `claude -p` CLI and parses its `stream-json` output (`content_block_delta` / `text_delta`), a floating picker panel, and an inline editor — results stream **into the note** as a CodeMirror 6 block widget (skeleton → live stream → word-level diff). No SDK is bundled.
 
+## Try it
+
+See it running in the [Obsidianverse sample vault](https://github.com/mariomile/obsidianverse-sample-vault) — a small, fictional vault with the whole plugin suite pre-configured.
+
 ## License
 
 MIT
