@@ -290,7 +290,7 @@ export class AIPanel extends Component {
     this.footerEl.empty();
     for (const b of buttons) {
       const btn = this.footerEl.createEl("button", {
-        cls: b.cta ? "selection-ai-btn mod-cta" : "selection-ai-btn",
+        cls: b.cta ? "selection-ai-btn is-primary" : "selection-ai-btn",
         text: b.label,
       });
       this.registerDomEvent(btn, "click", (e) => {

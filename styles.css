@@ -20,7 +20,8 @@
   box-shadow: var(--shadow-s);
   user-select: none;
   -webkit-user-select: none;
-  animation: selection-toolbar-in 90ms ease-out;
+  animation: selection-toolbar-in var(--cosmos-t-fast, 90ms)
+    var(--cosmos-native, cubic-bezier(0.32, 0.72, 0, 1));
 }
 
 @keyframes selection-toolbar-in {
@@ -29,6 +30,8 @@
 }
 
 .selection-toolbar-btn {
+  /* Colour wash — kit section 3 tier: fast duration, wash easing. */
+  --stb-wash: var(--cosmos-t-fast, 100ms) var(--mv-wash, cubic-bezier(0.25, 1, 0.5, 1));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -37,7 +40,7 @@
   border-radius: var(--radius-s);
   color: var(--text-muted);
   cursor: pointer;
-  transition: background-color 100ms ease, color 100ms ease;
+  transition: background-color var(--stb-wash), color var(--stb-wash);
 }
 
 .selection-toolbar-btn:hover {
@@ -107,7 +110,8 @@
   box-shadow: var(--shadow-l, var(--shadow-s));
   user-select: none;
   -webkit-user-select: none;
-  animation: selection-toolbar-in 90ms ease-out;
+  animation: selection-toolbar-in var(--cosmos-t-fast, 90ms)
+    var(--cosmos-native, cubic-bezier(0.32, 0.72, 0, 1));
 }
 
 /* Action chips. */
@@ -118,6 +122,8 @@
 }
 
 .selection-ai-action {
+  /* Colour wash — kit section 3 tier: fast duration, wash easing. */
+  --stb-wash: var(--cosmos-t-fast, 120ms) var(--mv-wash, cubic-bezier(0.25, 1, 0.5, 1));
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -128,7 +134,7 @@
   border: 1px solid transparent;
   border-radius: var(--radius-s);
   cursor: pointer;
-  transition: background-color 120ms ease, border-color 120ms ease;
+  transition: background-color var(--stb-wash), border-color var(--stb-wash);
 }
 
 .selection-ai-action:hover,
@@ -228,13 +234,15 @@
   background: var(--interactive-hover);
 }
 
-.selection-ai-btn.mod-cta {
+/* Primary affordance. Plugin-owned modifier, deliberately NOT Obsidian's
+   mod-cta (mv-kit section 5: no plugin button carries that class). */
+.selection-ai-btn.is-primary {
   background: var(--interactive-accent);
   color: var(--text-on-accent);
   border-color: transparent;
 }
 
-.selection-ai-btn.mod-cta:hover {
+.selection-ai-btn.is-primary:hover {
   background: var(--interactive-accent-hover);
 }
 
@@ -317,7 +325,8 @@
 .sk-inline-loading {
   gap: 11px;
   padding: 12px;
-  animation: sk-inline-in 140ms ease-out;
+  animation: sk-inline-in var(--cosmos-t-fast, 140ms)
+    var(--cosmos-native, cubic-bezier(0.32, 0.72, 0, 1));
 }
 
 @keyframes sk-inline-in {
@@ -388,6 +397,8 @@
 }
 
 .sk-inline-stop {
+  /* Colour wash — kit section 3 tier: fast duration, wash easing. */
+  --stb-wash: var(--cosmos-t-fast, 120ms) var(--mv-wash, cubic-bezier(0.25, 1, 0.5, 1));
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -400,7 +411,7 @@
   color: var(--text-muted);
   background: transparent;
   border: 1px solid var(--background-modifier-border);
-  transition: background-color 120ms ease, color 120ms ease;
+  transition: background-color var(--stb-wash), color var(--stb-wash);
 }
 
 .sk-inline-stop:hover {
@@ -432,10 +443,11 @@
   margin-left: 1px;
 }
 
-/* Shown only when the suggestion is identical to the selection. */
+/* Shown only when the suggestion is identical to the selection. An empty
+   state, so it takes the kit's whisper recipe: faint + font-ui-smaller. */
 .sk-inline-nochange {
   font-size: var(--font-ui-smaller);
-  color: var(--text-muted);
+  color: var(--text-faint);
 }
 
 .sk-inline-bar {
@@ -460,15 +472,20 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* Every keyframe here ends at the element's resting state, so cancelling
+     the animation outright is equivalent to collapsing its duration to zero
+     — and it keeps raw durations out of the stylesheet entirely. */
   .selection-toolbar,
   .selection-ai-panel {
-    animation-duration: 0ms;
+    animation: none;
   }
-  .selection-toolbar-btn {
-    transition-duration: 0ms;
+  .selection-toolbar-btn,
+  .selection-ai-action,
+  .sk-inline-stop {
+    transition: none;
   }
   .selection-ai-spinner {
-    animation-duration: 0ms;
+    animation: none;
   }
   .sk-inline-caret {
     animation: none;

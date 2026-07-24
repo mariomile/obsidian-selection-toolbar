@@ -101,7 +101,7 @@ class InlineWidget extends WidgetType {
     const bar = box.createDiv({ cls: "sk-inline-bar" });
     const btn = (label: string, cta: boolean, fn: () => void) => {
       const b = bar.createEl("button", {
-        cls: cta ? "selection-ai-btn mod-cta" : "selection-ai-btn",
+        cls: cta ? "selection-ai-btn is-primary" : "selection-ai-btn",
         text: label,
       });
       b.onclick = (e) => {
