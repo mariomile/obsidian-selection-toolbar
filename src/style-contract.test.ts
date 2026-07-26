@@ -96,4 +96,67 @@ describe("mv-kit style contract", () => {
       `!important count ${importantCount} exceeds the frozen ceiling of 2`,
     );
   });
+
+  // mv-kit §6 (Elevation & motion depth) — wave 2026-07 dinamica, per
+  // docs/2026-07-mv-kit-audit.md's "§6 — wave 2026-07 dinamica" section.
+  //
+  // "a touch tap must never leave a stuck hover state — plugins must not
+  // fight it with custom :hover outside @media (hover: hover) on
+  // phone-reachable elements." A bare `.foo:hover { }` rule at the
+  // stylesheet's top level fires on tap on touch devices and the visual
+  // state sticks until an unrelated tap elsewhere, because touch has no
+  // pointer to leave. Every plugin-owned `:hover` selector (`.selection-*`,
+  // `.sk-inline-*`) must sit inside an `@media (hover: hover)` block.
+  //
+  // Excludes `:focus-visible` — keyboard-only, never fires from a touch tap,
+  // so it is not a §6 hover-richness concern (mv-kit.md's own hover-richness
+  // MUST NOT names touch taps specifically, not focus).
+  it("§6: no bare :hover rule outside @media (hover: hover) on a plugin-owned selector", () => {
+    const lines = stripComments(css).split("\n");
+
+    let depth = 0;
+    const hoverGateDepths: number[] = [];
+    const violations: string[] = [];
+    // Selector lists can span multiple comma-continued lines (e.g.
+    // ".foo:hover,\n.foo:focus-visible {") — accumulate them so a :hover
+    // that only appears on an earlier continuation line is still caught.
+    let pendingSelector = "";
+
+    lines.forEach((rawLine, idx) => {
+      const line = rawLine.trim();
+      const opensHoverGate = /@media\s*\(hover:\s*hover\)/.test(line) && line.includes("{");
+
+      if (opensHoverGate) hoverGateDepths.push(depth);
+
+      if (!opensHoverGate && !line.includes("{") && line.endsWith(",")) {
+        // A selector-list continuation line (no declaration block yet).
+        pendingSelector += ` ${line}`;
+      } else if (!opensHoverGate && line.includes("{")) {
+        const fullSelector = `${pendingSelector} ${line}`;
+        pendingSelector = "";
+
+        const opensBareHoverRule =
+          /(?:^|,|\s)\.(?:selection|sk-inline)-[\w-]+(?:[.:][\w-]+)*:hover\b/.test(fullSelector);
+
+        if (opensBareHoverRule && hoverGateDepths.length === 0) {
+          violations.push(`line ${idx + 1}: "${fullSelector.trim()}"`);
+        }
+      } else if (!opensHoverGate) {
+        pendingSelector = "";
+      }
+
+      for (const ch of rawLine) {
+        if (ch === "{") depth += 1;
+        if (ch === "}") {
+          depth -= 1;
+          const gateDepth = hoverGateDepths[hoverGateDepths.length - 1];
+          if (gateDepth !== undefined && depth <= gateDepth) {
+            hoverGateDepths.pop();
+          }
+        }
+      }
+    });
+
+    assert.deepEqual(violations, []);
+  });
 });
