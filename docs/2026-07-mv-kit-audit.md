@@ -183,3 +183,133 @@ contract test.
   performed this wave.
 - Phone verification: **not applicable** — `isDesktopOnly: true`. Obsidian's
   `EmulateMobile` was not used at any point.
+
+---
+
+## §6 — wave 2026-07 dinamica
+
+Cantiere 2 audit (Elevation & motion depth) against
+`obsidian-cosmos-theme/docs/mv-kit.md` §6 (read in full at `10f5ddc`). Model
+commits consulted for scope/style: obsidian-portal `389d564`/`133c93d`/`4b95bf2`,
+obsidian-tabx `cc65cd4`/`a792752`/`662d11a`. Scope: elevation tier + hover
+richness + drag/panel/tab categories, desktop and phone. Minimal fixes only —
+no redesign, no restyling beyond the concrete §6 violations found.
+
+### Elevation hierarchy
+
+The plugin has exactly two floating, dismissible surfaces and zero persistent
+panels.
+
+| Surface | Dismiss behaviour | Shadow | Tier | Verdict |
+|---|---|---|---|---|
+| `.selection-toolbar` (formatting bar) | Closes on Escape, on selection loss, and when the AI panel/inline-edit opens (`src/main.ts:70-133`) — i.e. it never persists past its triggering selection, the mv-kit definition of "closes on outside-click" | `box-shadow: var(--shadow-s)` | **Pop** | **pass** — one tier, native token (not hand-picked rgba), no `blur`/`backdrop-filter`/`glass-*` token anywhere in the file (`grep -n "blur\|backdrop-filter\|glass"` on `styles.css`: zero hits), so there is no stacking to fix. Kit's own MUST is "never hand-pick a box-shadow" — `--shadow-s` is Obsidian's own elevation scale, already reviewed and waived as a native-token equivalent in the wave-9 §1 audit above; this wave reaches the same verdict from the §6 angle. |
+| `.selection-ai-panel` (AI action panel) | Same dismiss path (`aiPanel.close()` on Escape / selection loss) | `box-shadow: var(--shadow-l, var(--shadow-s))` | **Pop** | **pass** — same reasoning. Not **Glass**: although the panel visually sits over editor content the user may still be reading, mv-kit's Glass row requires the surface to actually consume `--cosmos-glass-surface`/`-blur`/`-outline`; this panel is opaque (`background: var(--background-primary)`, no transparency, no blur), so Pop is both the correct tier by dismiss-behaviour and the tier the file already implements — no change needed. |
+| `.sk-inline` / `.sk-inline-loading` (in-editor CM6 widget) | Not dismissed by outside-click at all — it resolves in place (accept/discard/stop) and is a document-flow block widget, not an overlay | `box-shadow: var(--shadow-s)` | **N/A — not a floating surface** | **pass, out of scope** — this widget is laid out inline in the CM6 document flow (`margin: 6px 0`), not `position: fixed`/`position: absolute` over content, so it isn't a candidate for any of §6's four tiers (Flat/Wash/Pop/Island/Glass are all about surfaces that float or persist *outside* flow). Its `--shadow-s` is a plain card border treatment, not an elevation-tier decision. |
+
+No element in the file stacks two tiers (e.g. Pop shadow **and** glass blur)
+— confirmed by the `grep` above: zero glass-token or `blur`/`backdrop-filter`
+usage anywhere, so there is nothing to stack against the two Pop shadows.
+
+**Desktop / phone:** identical tier reasoning applies to both — but see the
+global phone waiver above (`isDesktopOnly: true`): neither floating surface
+ever renders on a phone screen, so there is no phone-specific Pop-vs-bottom-sheet
+question to answer here in practice.
+
+### Hover richness
+
+Five bare `:hover` rules were found, none gated behind
+`@media (hover: hover)`:
+
+| Selector | Line (pre-fix) | Fix |
+|---|---|---|
+| `.selection-toolbar-btn:hover` | 46 | wrapped in `@media (hover: hover)` |
+| `.selection-ai-action:hover, .selection-ai-action:focus-visible` | 140-141 | split — `:hover` wrapped in `@media (hover: hover)`; `:focus-visible` left bare as its own rule (keyboard-only, never a hover-richness concern) |
+| `.selection-ai-btn:hover` | 233 | wrapped in `@media (hover: hover)` |
+| `.selection-ai-btn.is-primary:hover` | 245 | wrapped in `@media (hover: hover)` |
+| `.sk-inline-stop:hover` | 417 | wrapped in `@media (hover: hover)` |
+
+None of the five paired a colour wash with a `transform` lift on the same
+interaction — every one of them changes only `background`/`color`/`border-color`,
+so there was no `--mv-wash`/`--mv-lift` mixing to untangle, and no lift
+transform to cap at ≤2px (none exists in this file — `grep -n "translateY\|transform"
+styles.css` shows only the two entrance keyframes and the spinner's
+`rotate(360deg)`, none of them a hover-triggered lift). This plugin does not
+add hover-triggered physical lift anywhere; its hover language is
+colour-only, which is the kit's "Wash" tier by definition and needs no
+easing-token split.
+
+**Why this matters even though the plugin is `isDesktopOnly`:** the brief for
+this wave notes "the toolbar appears on touch selection on phones" as the
+motivating risk. That premise does not hold for *this specific plugin* —
+`manifest.json` sets `isDesktopOnly: true`, and the wave-9 audit above
+documents why (`src/ai/client.ts` spawns a Node `child_process`, unavailable
+on mobile): Obsidian refuses to load the plugin on iOS/Android at all, so
+none of these five rules can ever fire from a touch tap today. The fixes were
+applied anyway, for two reasons: (1) mv-kit's MUST NOT is written as an
+unconditional rule about the selector, not conditioned on the current value of
+a manifest flag Mario could flip later; (2) the gating costs nothing —
+zero visual or behavioural change on desktop, verified by `pnpm release:check`
+below. This is flagged explicitly rather than silently treated as "waived —
+never loads on phone" (the wave-9 §2 pattern for the touch-target-floor rule)
+because unlike that MUST (which requires adding real phone-only CSS that
+provably can't execute), this MUST NOT costs nothing to satisfy regardless of
+reachability, so satisfying it is strictly better than a waiver.
+
+**Desktop:** all five interactions still work identically under a real mouse
+— `@media (hover: hover)` matches any device with a hover-capable pointer,
+which every desktop environment has. No behaviour change, confirmed by the
+`pnpm release:check` build below.
+
+**Phone:** N/A in practice (`isDesktopOnly: true`, see above) — but now also
+N/A structurally: even in a hypothetical future where the plugin becomes
+mobile-enabled, these five rules would already be correctly inert on touch
+without needing a follow-up fix.
+
+### Drag / panel / tab categories
+
+**N/A, nessuna superficie di questo tipo.** Confirmed by inspection, not
+assumed:
+
+- **Drag** — `grep -n "drag\|Drag"` across `src/*.ts` and `styles.css`
+  returns zero hits for any drag-and-drop implementation (the two comment
+  hits in `src/main.ts` referring to "the user is still dragging out a
+  selection" describe native text-selection dragging, which this plugin only
+  *listens* to via `selectionchange`/`mouseup` — it never positions a
+  draggable element itself). No `.is-dragging`/`.is-dropped`-shaped code
+  exists.
+- **Persistent panel** — the plugin has no sidebar, no drawer, nothing that
+  "persists in the layout" per §6's Island definition. `.selection-ai-panel`
+  is named "panel" but is dismissible floating chrome (see the elevation
+  table above), not a persistent panel in the kit's structural sense — it
+  gets the Pop verdict, not the Panel-transition category.
+- **Tab switch** — the plugin renders no tabs and has no tab-content-swap
+  surface anywhere in its UI (toolbar row, AI action chips + textarea +
+  output, inline CM6 widget, settings tab using Obsidian's native
+  `PluginSettingTab` API). Nothing to crossfade.
+
+### Verification
+
+- `pnpm typecheck` — **0 errors**
+- `pnpm test` — **7/7 pass**, 1 suite (2 pre-existing in `src/ai/guard.test.ts`
+  unchanged + 5 in `src/style-contract.test.ts`: the 4 wave-9 assertions,
+  still green, plus 1 new §6 assertion this wave)
+- `pnpm build` — succeeds (esbuild production bundle, gated on the typecheck
+  above)
+- `pnpm release:check` (`test && build`) — **green**, exit 0
+- `pnpm lint` — **this repo has no lint script**, confirmed again this wave
+  (`package.json` scripts: `dev`, `build`, `release:check`, `typecheck`,
+  `test` only; no eslint/biome config file in the tree). No lint run is
+  claimed.
+- Red-before-green for the new §6 assertion: `git stash`-reverted `styles.css`
+  to its pre-fix state (sha1 `78785a635ad87cdd55c9da9f641acb10ac5730f9` is the
+  post-fix file), reran `pnpm test` — the new assertion failed, listing all 5
+  violations by line number (including the two-line `.selection-ai-action:hover,
+  .selection-ai-action:focus-visible {` selector, which the line-scan
+  correctly attributes to its rule-opening line via comma-continuation
+  tracking) while the 6 pre-existing assertions stayed green; restored
+  `styles.css` via `git stash pop` (sha1 verified byte-identical:
+  `78785a635ad87cdd55c9da9f641acb10ac5730f9`), reran — all 7 pass.
+- Desktop screenshot / live vault reload verification: **pending** — not
+  performed this wave, consistent with wave-9's own note above.
+- Phone verification: **not applicable** — `isDesktopOnly: true`. Obsidian's
+  `EmulateMobile` was not used at any point.
