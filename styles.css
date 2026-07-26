@@ -43,9 +43,17 @@
   transition: background-color var(--stb-wash), color var(--stb-wash);
 }
 
-.selection-toolbar-btn:hover {
-  background: var(--background-modifier-hover);
-  color: var(--text-normal);
+/* mv-kit §6: custom :hover on a phone-reachable element must live inside
+   @media (hover: hover) — a bare rule fires on tap and leaves the wash
+   "stuck" until an unrelated tap elsewhere, since touch has no pointer to
+   leave. This plugin ships isDesktopOnly (see docs/2026-07-mv-kit-audit.md),
+   so it never actually renders on touch today — gating anyway costs nothing
+   and keeps the rule true to the letter, not just the current manifest flag. */
+@media (hover: hover) {
+  .selection-toolbar-btn:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+  }
 }
 
 .selection-toolbar-btn:active {
@@ -137,7 +145,18 @@
   transition: background-color var(--stb-wash), border-color var(--stb-wash);
 }
 
-.selection-ai-action:hover,
+/* mv-kit §6: gated, see the .selection-toolbar-btn:hover comment above.
+   :focus-visible is split out below, unchanged and ungated — it is
+   keyboard-only and never fires from a touch tap, so it is not a §6
+   hover-richness concern. */
+@media (hover: hover) {
+  .selection-ai-action:hover {
+    background: var(--background-modifier-active-hover);
+    border-color: var(--background-modifier-border);
+    outline: none;
+  }
+}
+
 .selection-ai-action:focus-visible {
   background: var(--background-modifier-active-hover);
   border-color: var(--background-modifier-border);
@@ -230,8 +249,11 @@
   color: var(--text-normal);
 }
 
-.selection-ai-btn:hover {
-  background: var(--interactive-hover);
+/* mv-kit §6: gated, see the .selection-toolbar-btn:hover comment above. */
+@media (hover: hover) {
+  .selection-ai-btn:hover {
+    background: var(--interactive-hover);
+  }
 }
 
 /* Primary affordance. Plugin-owned modifier, deliberately NOT Obsidian's
@@ -242,8 +264,11 @@
   border-color: transparent;
 }
 
-.selection-ai-btn.is-primary:hover {
-  background: var(--interactive-accent-hover);
+/* mv-kit §6: gated, see the .selection-toolbar-btn:hover comment above. */
+@media (hover: hover) {
+  .selection-ai-btn.is-primary:hover {
+    background: var(--interactive-accent-hover);
+  }
 }
 
 .selection-ai-btn:disabled {
@@ -414,9 +439,12 @@
   transition: background-color var(--stb-wash), color var(--stb-wash);
 }
 
-.sk-inline-stop:hover {
-  background: var(--background-modifier-hover);
-  color: var(--text-normal);
+/* mv-kit §6: gated, see the .selection-toolbar-btn:hover comment above. */
+@media (hover: hover) {
+  .sk-inline-stop:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+  }
 }
 
 .sk-inline-stop-icon {
