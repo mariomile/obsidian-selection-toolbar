@@ -14,10 +14,13 @@
   align-items: center;
   gap: 2px;
   padding: 4px;
-  background: var(--background-secondary);
-  border: 1px solid var(--background-modifier-border);
+  /* Superficie, bordo e ombra dal contratto di elevazione della suite, coi
+     letterali storici come fallback: questa capsula flotta sopra l'editor, e
+     --background-secondary non garantisce un gradino su ogni palette. */
+  background: var(--mv-card-bg, var(--background-secondary));
+  border: 1px solid var(--mv-card-border, var(--background-modifier-border));
   border-radius: var(--radius-m);
-  box-shadow: var(--shadow-s);
+  box-shadow: var(--mv-card-rest, var(--shadow-s));
   user-select: none;
   -webkit-user-select: none;
   animation: selection-toolbar-in var(--cosmos-t-fast, 90ms)
