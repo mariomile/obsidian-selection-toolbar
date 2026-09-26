@@ -1,5 +1,8 @@
 # Exo AI Selection Toolbar
 
+> [!WARNING]
+> **Deprecated (2026-09-26).** This plugin is no longer maintained. Its selection toolbar and AI text actions now live inside [Exo Agent](https://github.com/mariomile/obsidian-exo-agent), available in the Obsidian community directory. Install Exo Agent and disable this plugin. The repository is archived and read-only.
+
 A floating formatting toolbar for [Obsidian](https://obsidian.md) that appears when you select text in the editor — quick access to the most common Markdown commands, plus AI text actions powered by Claude. Desktop only.
 
 The toolbar is themed entirely via Obsidian's CSS variables, so it matches your active theme (light, dark, or any community theme) automatically.
